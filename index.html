@@ -124,7 +124,7 @@
 
             <div class="chat-box" id="chat-container" style="display: none;">
                 <div class="chat-messages" id="chat-messages">
-                    <div class="msg" style="color: #8d99ae; text-align:center;">Khung chat trực tuyến</div>
+                    <div class="msg" style="color: #8d99ae; text-align:center;">Hệ thống chat sẵn sàng</div>
                 </div>
                 <div class="input-group">
                     <input type="text" id="chat-input" placeholder="Nhắn tin..." onkeypress="if(event.key==='Enter') sendChat()">
@@ -161,23 +161,26 @@
             const randomID = Math.floor(1000 + Math.random() * 9000).toString();
             peer = new Peer('chess-' + randomID, { config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
             peer.on('open', id => $('#my-id').text(id.replace('chess-', '')));
+            
             peer.on('connection', connection => {
-                connection.on('data', data => {
+                conn = connection;
+                setupConnection();
+                
+                conn.on('data', data => {
                     if (data.type === 'challenge_request') {
                         if (confirm(`[${data.fromName}] muốn đấu online với bạn. Đồng ý?`)) {
-                            // Tự động chuyển chế độ sang online để tránh lỗi xung đột với AI
+                            // Ép buộc đổi selectbox sang online ngay lập tức
                             $('#game-mode').val('online');
-                            changeMode();
+                            gameMode = 'online';
+                            $('#online-controls, #chat-container').show();
                             
-                            conn = connection;
                             myColor = 'b';
                             board.orientation('black');
-                            setupConnection();
                             conn.send({ type: 'challenge_response', accepted: true, name: myUsername });
                             resetGame();
-                            alert(`Đã kết nối với [${data.fromName}]! Bạn cầm quân Đen.`);
+                            addChat('Hệ thống', `Đã kết nối với [${data.fromName}]! Bạn cầm quân Đen.`);
                         } else {
-                            connection.send({ type: 'challenge_response', accepted: false });
+                            conn.send({ type: 'challenge_response', accepted: false });
                         }
                     } else {
                         handleIncomingData(data);
@@ -190,28 +193,33 @@
             const targetID = $('#peer-id-input').val().trim();
             if (!targetID) return alert('Nhập ID đối thủ!');
             
-            // Chuyển chế độ sang online
             gameMode = 'online';
+            conn = peer.connect('chess-' + targetID);
             
-            const tempConn = peer.connect('chess-' + targetID);
-            tempConn.on('open', () => tempConn.send({ type: 'challenge_request', fromName: myUsername }));
-            tempConn.on('data', data => {
-                if (data.type === 'challenge_response' && data.accepted) {
-                    conn = tempConn;
-                    myColor = 'w';
-                    board.orientation('white');
-                    setupConnection();
-                    resetGame();
-                    alert(`Đã kết nối thành công với [${data.name}]! Bạn cầm quân Trắng.`);
+            conn.on('open', () => {
+                conn.send({ type: 'challenge_request', fromName: myUsername });
+                setupConnection();
+            });
+
+            conn.on('data', data => {
+                if (data.type === 'challenge_response') {
+                    if (data.accepted) {
+                        myColor = 'w';
+                        board.orientation('white');
+                        resetGame();
+                        addChat('Hệ thống', `Đã kết nối thành công với [${data.name}]! Bạn cầm quân Trắng.`);
+                    } else {
+                        alert('Đối thủ từ chối thách đấu.');
+                    }
+                } else {
+                    handleIncomingData(data);
                 }
             });
         }
 
         function setupConnection() {
-            if (conn) {
-                conn.off('data'); // Xóa các sự kiện cũ tránh lặp
-                conn.on('data', data => handleIncomingData(data));
-            }
+            if (!conn) return;
+            conn.on('data', data => handleIncomingData(data));
         }
 
         function handleIncomingData(data) {
@@ -242,13 +250,12 @@
         function onDragStart(source, piece) {
             if (game.game_over()) return false;
             
-            // Nếu đang đấu online, kiểm tra xem có đúng lượt của mình không và đã có kết nối chưa
+            // Nếu đang kết nối online, khóa màu cờ theo phân công (Trắng/Đen)
             if (gameMode === 'online') {
                 if (!conn) return false;
                 if ((game.turn() === 'w' && myColor !== 'w') || (game.turn() === 'b' && myColor !== 'b')) return false;
             }
             
-            // Kiểm tra màu quân cờ theo lượt
             if ((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
                 return false;
             }
@@ -256,12 +263,12 @@
 
         function onDrop(source, target) {
             let move = game.move({ from: source, to: target, promotion: 'q' });
-            if (move === null) return 'snapback'; // Đi sai luật -> trả về
+            if (move === null) return 'snapback';
 
             updateStatus();
 
-            // Phân biệt rõ hành động dựa vào gameMode hiện tại
-            if (gameMode === 'online' && conn) {
+            // KIỂM TRA NGHIÊM NGẶT: Nếu có kết nối mạng, LUÔN LUÔN gửi nước đi qua peer, TUYỆT ĐỐI KHÔNG gọi AI
+            if (conn && conn.open) {
                 conn.send({ type: 'move', move: { from: source, to: target, promotion: 'q' } });
             } else if (gameMode === 'ai' && !game.game_over()) {
                 setTimeout(makeAIMove, 300);
@@ -271,7 +278,8 @@
         function onSnapEnd() { board.position(game.fen()); }
 
         function makeAIMove() {
-            if (gameMode !== 'ai') return; // Chặn tuyệt đối không cho AI đánh nếu đang chơi online
+            // Chặn tuyệt đối nếu không ở chế độ AI hoặc đang có kết nối mạng
+            if (gameMode !== 'ai' || (conn && conn.open)) return;
             const moves = game.moves();
             if (moves.length === 0) return;
             game.move(moves[Math.floor(Math.random() * moves.length)]);
@@ -282,8 +290,12 @@
         function sendChat() {
             const txt = $('#chat-input').val().trim();
             if (!txt) return;
-            addChat('Bạn', txt, 'me');
-            if (gameMode === 'online' && conn) conn.send({ type: 'chat', text: txt, sender: myUsername });
+            
+            addChat(myUsername, txt, 'me');
+
+            if (conn && conn.open) {
+                conn.send({ type: 'chat', text: txt, sender: myUsername });
+            }
             $('#chat-input').val('');
         }
 
@@ -294,20 +306,20 @@
 
         function resignGame() {
             if (confirm('Nhận thua?')) {
-                if (gameMode === 'online' && conn) conn.send({ type: 'resign' });
+                if (conn && conn.open) conn.send({ type: 'resign' });
                 resetGame();
             }
         }
 
         function offerDraw() {
-            if (gameMode === 'online' && conn) {
+            if (conn && conn.open) {
                 conn.send({ type: 'draw_request' });
                 alert('Đã gửi yêu cầu hòa!');
             } else alert('Chỉ dùng được khi đấu online!');
         }
 
         function requestReset() { 
-            if (gameMode === 'online' && conn) conn.send({ type: 'reset' });
+            if (conn && conn.open) conn.send({ type: 'reset' });
             resetGame(); 
         }
 
@@ -337,7 +349,10 @@
                 $('#online-controls, #chat-container').show();
             } else {
                 $('#online-controls, #chat-container').hide();
-                conn = null; // Ngắt kết nối online khi chuyển về đấu máy
+                if (conn) {
+                    conn.close();
+                    conn = null;
+                }
             }
             resetGame();
         }
