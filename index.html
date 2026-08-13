@@ -65,21 +65,21 @@
         .board-box { 
             width: 100%; 
             aspect-ratio: 1 / 1; 
-            touch-action: none !important; 
             position: relative;
+            touch-action: none !important;
         }
         #myBoard { 
             width: 100% !important; 
             height: 100% !important; 
-            touch-action: none !important; 
+            touch-action: none !important;
         }
 
-        /* HIỆU ỨNG GỢI Ý Ô CÓ THỂ ĐI (CHẤM TRÒN HOẶC VIỀN) */
+        /* GỢI Ý Ô CÓ THỂ ĐI (CHẤM TRÒN) */
         .highlight-hint {
             position: absolute;
             width: 32%;
             height: 32%;
-            background: rgba(46, 196, 182, 0.7);
+            background: rgba(46, 196, 182, 0.8);
             border-radius: 50%;
             top: 34%;
             left: 34%;
@@ -213,7 +213,10 @@
             myUsername = name;
             $('#my-name').text(myUsername);
             $('#login-modal').fadeOut();
-            setTimeout(() => { board.resize(); setupSquareClick(); }, 150);
+            setTimeout(() => { 
+                board.resize(); 
+                setupSquareClick(); 
+            }, 150);
             initPeer();
         }
 
@@ -286,7 +289,8 @@
 
         function handleIncomingData(data) {
             if (data.type === 'move') {
-                animateAndExecuteMove(data.move.from, data.move.to, () => {
+                board.position(game.fen());
+                animateMove(data.move.from, data.move.to, () => {
                     game.move(data.move);
                     board.position(game.fen());
                     updateStatus();
@@ -308,7 +312,7 @@
             }
         }
 
-        // THAY THẾ KÉO THẢ BẰNG CƠ CHẾ CLICK CHỌN Ô
+        // CƠ CHẾ ĐIỀU KHIỂN BẰNG CLICK HOÀN TOÀN
         function setupSquareClick() {
             $('#myBoard .square-55d63').off('click').on('click', function() {
                 if (game.game_over()) return;
@@ -320,7 +324,7 @@
                     if ((game.turn() === 'w' && myColor !== 'w') || (game.turn() === 'b' && myColor !== 'b')) return;
                 }
 
-                // Nếu đã chọn một quân cờ trước đó và bấm vào ô đích hợp lệ
+                // Nếu đã chọn quân cờ trước đó và bấm vào ô đích hợp lệ
                 if (selectedSquare) {
                     let matchMove = possibleMoves.find(m => m.to === square);
                     if (matchMove) {
@@ -328,7 +332,8 @@
                         clearHighlights();
                         selectedSquare = null;
 
-                        animateAndExecuteMove(from, square, () => {
+                        board.position(game.fen());
+                        animateMove(from, square, () => {
                             game.move({ from: from, to: square, promotion: 'q' });
                             board.position(game.fen());
                             updateStatus();
@@ -368,7 +373,8 @@
             $('#myBoard .highlight-hint').remove();
         }
 
-        function animateAndExecuteMove(source, target, callback) {
+        // HIỆU ỨNG ANIMATION DI CHUYỂN
+        function animateMove(source, target, callback) {
             let pieceObj = game.get(source);
             let $sourceSquare = $(`#myBoard .square-${source}`);
             let $targetSquare = $(`#myBoard .square-${target}`);
@@ -398,16 +404,16 @@
 
             if (pieceObj.type === 'n') {
                 let midLeft = (targetPos.left + $sourceSquare.position().left) / 2;
-                let midTop = Math.min(targetPos.top, $sourceSquare.position().top) - 30;
+                let midTop = Math.min(targetPos.top, $sourceSquare.position().top) - 35;
 
-                $clone.animate({ left: midLeft, top: midTop }, 180, 'linear', function() {
-                    $(this).animate({ left: targetPos.left, top: targetPos.top }, 180, 'linear', function() {
+                $clone.animate({ left: midLeft, top: midTop }, 160, 'linear', function() {
+                    $(this).animate({ left: targetPos.left, top: targetPos.top }, 160, 'linear', function() {
                         $(this).remove();
                         callback();
                     });
                 });
             } else {
-                $clone.animate({ left: targetPos.left, top: targetPos.top }, 250, 'easeInOutQuad', function() {
+                $clone.animate({ left: targetPos.left, top: targetPos.top }, 220, 'swing', function() {
                     $(this).remove();
                     callback();
                 });
@@ -421,7 +427,8 @@
             
             const randomMove = possibleMovesList[Math.floor(Math.random() * possibleMovesList.length)];
             
-            animateAndExecuteMove(randomMove.from, randomMove.to, () => {
+            board.position(game.fen());
+            animateMove(randomMove.from, randomMove.to, () => {
                 game.move(randomMove);
                 board.position(game.fen());
                 updateStatus();
@@ -487,6 +494,7 @@
             game.reset();
             board.start();
             clearHighlights();
+            selectedSquare = null;
             isGameOverShown = false;
             if (gameMode === 'online') {
                 board.orientation(myColor === 'w' ? 'white' : 'black');
@@ -561,15 +569,16 @@
             resetGame();
         }
 
+        // Khởi tạo bàn cờ TẮT HOÀN TOÀN kéo thả (draggable: false)
         board = Chessboard('myBoard', {
-            draggable: false, // Vô hiệu hóa kéo thả mặc định để dùng bấm chọn
+            draggable: false,
             position: 'start',
             pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
         });
 
         $(window).resize(() => board.resize());
         
-        // Khởi tạo sự kiện click ngay khi tải xong
+        // Kích hoạt tính năng bấm chọn ô ngay khi tải trang
         setTimeout(() => { setupSquareClick(); }, 300);
     </script>
 </body>
