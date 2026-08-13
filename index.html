@@ -3,62 +3,353 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cờ Vua Trực Tuyến</title>
+    <title>Cờ Vua Trực Tuyến Pro</title>
+    
+    <!-- Thư viện CSS & JS Chuẩn -->
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
-    
+
     <style>
-        body { background: #0b1329; color: white; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px; }
-        #myBoard { width: 100% !important; max-width: 400px; touch-action: none; }
-        .controls { width: 100%; max-width: 400px; margin-top: 10px; }
-        input { width: 100%; padding: 10px; border-radius: 5px; border: none; margin-bottom: 5px; }
-        button { width: 100%; padding: 10px; border-radius: 5px; border: none; background: #00b4d8; color: white; font-weight: bold; }
+        :root {
+            --bg-main: #0b1329;
+            --bg-card: #1c2541;
+            --accent-gold: #ffc107;
+            --accent-blue: #00b4d8;
+            --accent-green: #2ec4b6;
+            --accent-red: #e63946;
+            --text-light: #edf2f4;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: var(--bg-main); color: var(--text-light); min-height: 100vh; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+
+        /* Màn hình đăng nhập */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 19, 41, 0.95);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 9999; padding: 20px;
+        }
+        .modal-box {
+            background: var(--bg-card); padding: 25px; border-radius: 12px;
+            width: 100%; max-width: 360px; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #3a506b;
+        }
+        .modal-box h2 { color: var(--accent-gold); margin-bottom: 15px; font-size: 1.4rem; }
+
+        header { text-align: center; margin-bottom: 10px; width: 100%; }
+        h1 { color: var(--accent-gold); font-size: 1.4rem; }
+        .user-badge { background: rgba(255, 255, 255, 0.08); padding: 5px 12px; border-radius: 20px; display: inline-block; margin-top: 5px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.1); }
+
+        .main-container { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 440px; align-items: center; }
+
+        /* Bàn cờ vuông vắn, chống kéo màn hình điện thoại */
+        .board-box { width: 100%; aspect-ratio: 1 / 1; }
+        #myBoard { width: 100% !important; height: 100% !important; touch-action: none; }
+
+        .panel { width: 100%; background: var(--bg-card); padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .status-box { background: #0b1329; padding: 8px; border-radius: 6px; text-align: center; font-weight: 600; color: var(--accent-blue); font-size: 0.9rem; }
+
+        .input-group { display: flex; gap: 6px; width: 100%; }
+        input, select, button {
+            padding: 8px 10px; border-radius: 6px; border: 1px solid #3a506b;
+            background: #0b1329; color: white; font-size: 0.85rem; outline: none;
+        }
+        input { flex: 1; min-width: 0; }
+        button { background: var(--accent-green); color: white; font-weight: 600; cursor: pointer; border: none; white-space: nowrap; }
+        button:active { opacity: 0.8; }
+
+        /* Khung Chat */
+        .chat-box {
+            background: #0b1329; border-radius: 8px; padding: 8px;
+            height: 110px; display: flex; flex-direction: column; gap: 4px;
+        }
+        .chat-messages {
+            flex: 1; overflow-y: auto; font-size: 0.8rem;
+            display: flex; flex-direction: column; gap: 3px;
+        }
+        .msg { padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); max-width: 90%; word-break: break-word; }
+        .msg.me { background: #1d3557; align-self: flex-end; color: #a8dadc; }
+        .msg.peer { background: #3a506b; align-self: flex-start; }
+
+        .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     </style>
 </head>
 <body>
-    <div id="myBoard"></div>
-    <div class="controls">
-        <div id="my-id-display" style="text-align:center; margin-bottom:10px;">Đang lấy ID...</div>
-        <input type="text" id="target-id" placeholder="Nhập ID đối thủ...">
-        <button onclick="connectToPeer()">THÁCH ĐẤU</button>
+
+    <!-- Popup Đăng Nhập -->
+    <div class="modal-overlay" id="login-modal">
+        <div class="modal-box">
+            <h2><i class="fa-solid fa-user-gear"></i> ĐĂNG NHẬP GAME</h2>
+            <p style="font-size: 0.85rem; color: #8d99ae; margin-bottom: 15px;">Nhập tên của bạn để bắt đầu</p>
+            <input type="text" id="username-input" placeholder="Tên người chơi..." style="width: 100%; margin-bottom: 12px;" onkeypress="if(event.key==='Enter') login()">
+            <button style="width: 100%; padding: 10px;" onclick="login()">VÀO BÀN CỜ</button>
+        </div>
+    </div>
+
+    <header>
+        <h1><i class="fa-solid fa-chess"></i> CỜ VUA TRỰC TUYẾN</h1>
+        <div class="user-badge">
+            <span id="my-name">Khách</span> | <b>ID: <span id="my-id" style="color: var(--accent-gold);">Đang tạo...</span></b>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Bàn cờ -->
+        <div class="board-box">
+            <div id="myBoard"></div>
+        </div>
+
+        <!-- Bảng điều khiển -->
+        <div class="panel">
+            <div class="status-box" id="status">Lượt đi: Trắng</div>
+
+            <div class="input-group">
+                <select id="game-mode" style="width:100%" onchange="changeMode()">
+                    <option value="ai">Đấu với Máy (AI)</option>
+                    <option value="online">Đấu Trực Tuyến (Thách đấu ID)</option>
+                </select>
+            </div>
+
+            <div class="input-group" id="online-controls" style="display: none;">
+                <input type="text" id="peer-id-input" placeholder="ID đối thủ..." maxlength="4">
+                <button onclick="requestChallenge()"><i class="fa-solid fa-paper-plane"></i> Thách Đấu</button>
+            </div>
+
+            <!-- Khung Chat (Chỉ hiện khi đấu online) -->
+            <div class="chat-box" id="chat-container" style="display: none;">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="msg" style="color: #8d99ae; text-align:center;">Hệ thống: Đã kết nối khung chat</div>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="chat-input" placeholder="Nhắn tin..." onkeypress="if(event.key==='Enter') sendChat()">
+                    <button onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+
+            <!-- Nút chức năng -->
+            <div class="btn-grid">
+                <button style="background: var(--accent-red);" onclick="resignGame()">Đầu hàng</button>
+                <button style="background: var(--accent-gold); color: black;" onclick="offerDraw()">Cầu hòa</button>
+                <button style="background: #f77f00;" onclick="requestReset()">Ván mới</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Cấu hình STUN Server để xuyên tường lửa
-        const peerConfig = {
-            config: {
-                'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }]
+        let board = null;
+        let game = new Chess();
+        let peer = null, conn = null;
+        let myColor = 'w', gameMode = 'ai';
+        let myUsername = "Player";
+
+        function login() {
+            const name = $('#username-input').val().trim();
+            if (!name) return alert('Vui lòng nhập tên!');
+            myUsername = name;
+            $('#my-name').text(myUsername);
+            $('#login-modal').fadeOut();
+            setTimeout(() => { board.resize(); }, 150);
+            initPeer();
+        }
+
+        function initPeer() {
+            const randomID = Math.floor(1000 + Math.random() * 9000).toString();
+            peer = new Peer('chess-' + randomID, { config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
+
+            peer.on('open', id => {
+                $('#my-id').text(id.replace('chess-', ''));
+            });
+
+            peer.on('connection', connection => {
+                connection.on('data', data => {
+                    if (data.type === 'challenge_request') {
+                        if (confirm(`[${data.fromName}] muốn thách đấu. Đồng ý?`)) {
+                            conn = connection;
+                            myColor = 'b';
+                            board.orientation('black');
+                            setupConnection();
+                            conn.send({ type: 'challenge_response', accepted: true, name: myUsername });
+                            addChat('Hệ thống', `Đã kết nối với [${data.fromName}]! Bạn cầm quân ĐEN.`);
+                            resetGame();
+                        } else {
+                            connection.send({ type: 'challenge_response', accepted: false });
+                        }
+                    } else {
+                        handleIncomingData(data);
+                    }
+                });
+            });
+        }
+
+        function requestChallenge() {
+            const targetID = $('#peer-id-input').val().trim();
+            if (!targetID) return alert('Nhập ID đối thủ!');
+            addChat('Hệ thống', `Đang gọi tới ID ${targetID}...`);
+            const tempConn = peer.connect('chess-' + targetID);
+
+            tempConn.on('open', () => {
+                tempConn.send({ type: 'challenge_request', fromName: myUsername, fromID: $('#my-id').text() });
+            });
+
+            tempConn.on('data', data => {
+                if (data.type === 'challenge_response') {
+                    if (data.accepted) {
+                        conn = tempConn;
+                        myColor = 'w';
+                        board.orientation('white');
+                        setupConnection();
+                        addChat('Hệ thống', `[${data.name}] đã nhận lời! Bạn cầm quân TRẮNG.`);
+                        resetGame();
+                    } else {
+                        alert('Đối thủ từ chối!');
+                    }
+                } else {
+                    handleIncomingData(data);
+                }
+            });
+        }
+
+        function setupConnection() {
+            conn.on('data', data => handleIncomingData(data));
+        }
+
+        function handleIncomingData(data) {
+            if (data.type === 'move') {
+                game.move(data.move);
+                board.position(game.fen());
+                updateStatus();
+            } else if (data.type === 'chat') {
+                addChat(data.sender, data.text, 'peer');
+            } else if (data.type === 'resign') {
+                alert('Đối thủ đã đầu hàng! Bạn thắng 🎉');
+            } else if (data.type === 'draw_request') {
+                if (confirm('Đối thủ muốn cầu hòa. Đồng ý?')) {
+                    conn.send({ type: 'draw_accept' });
+                    alert('Ván đấu hòa!');
+                    resetGame();
+                }
+            } else if (data.type === 'draw_accept') {
+                alert('Đối thủ đã đồng ý hòa!');
+                resetGame();
+            } else if (data.type === 'reset') {
+                resetGame();
             }
-        };
-
-        let peer = new Peer(peerConfig); // Tạo Peer không tiền tố
-        let conn = null;
-
-        peer.on('open', id => {
-            $('#my-id-display').text("ID CỦA BẠN: " + id);
-        });
-
-        peer.on('connection', c => {
-            conn = c;
-            setupConn();
-            alert("Đối thủ đã kết nối!");
-        });
-
-        function connectToPeer() {
-            let target = $('#target-id').val();
-            conn = peer.connect(target, peerConfig);
-            setupConn();
         }
 
-        function setupConn() {
-            conn.on('open', () => alert("Đã kết nối thành công!"));
-            conn.on('data', data => console.log("Nhận được:", data));
+        // Kiểm tra luật cờ khi bắt đầu kéo quân
+        function onDragStart(source, piece) {
+            if (game.game_over()) return false;
+            if (gameMode === 'online') {
+                if (!conn) return false;
+                if ((game.turn() === 'w' && myColor !== 'w') || (game.turn() === 'b' && myColor !== 'b')) return false;
+            }
+            if ((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) return false;
         }
 
-        var board = Chessboard('myBoard', 'start');
+        // Thả quân cờ: Bắt buộc đúng luật cờ vua
+        function onDrop(source, target) {
+            const move = game.move({ from: source, to: target, promotion: 'q' });
+            if (move === null) return 'snapback'; // Sai luật -> trả về chỗ cũ ngay lập tức
+
+            updateStatus();
+
+            if (gameMode === 'online' && conn) {
+                conn.send({ type: 'move', move: { from: source, to: target, promotion: 'q' } });
+            } else if (gameMode === 'ai' && !game.game_over()) {
+                setTimeout(makeAIMove, 300);
+            }
+        }
+
+        function onSnapEnd() { board.position(game.fen()); }
+
+        function makeAIMove() {
+            const moves = game.moves();
+            if (moves.length === 0) return;
+            game.move(moves[Math.floor(Math.random() * moves.length)]);
+            board.position(game.fen());
+            updateStatus();
+        }
+
+        function sendChat() {
+            const txt = $('#chat-input').val().trim();
+            if (!txt) return;
+            addChat('Bạn', txt, 'me');
+            if (gameMode === 'online' && conn) conn.send({ type: 'chat', text: txt, sender: myUsername });
+            $('#chat-input').val('');
+        }
+
+        function addChat(sender, txt, cls = '') {
+            $('#chat-messages').append(`<div class="msg ${cls}"><b>${sender}:</b> ${txt}</div>`);
+            $('#chat-messages').scrollTop($('#chat-messages')[0].scrollHeight);
+        }
+
+        function resignGame() {
+            if (confirm('Bạn muốn nhận thua?')) {
+                if (gameMode === 'online' && conn) conn.send({ type: 'resign' });
+                alert('Bạn đã thua!');
+                resetGame();
+            }
+        }
+
+        function offerDraw() {
+            if (gameMode === 'online' && conn) {
+                conn.send({ type: 'draw_request' });
+                alert('Đã gửi lời cầu hòa!');
+            } else {
+                alert('Chỉ dùng được khi đấu online!');
+            }
+        }
+
+        function requestReset() {
+            if (confirm('Bắt đầu ván mới?')) {
+                if (gameMode === 'online' && conn) conn.send({ type: 'reset' });
+                resetGame();
+            }
+        }
+
+        function resetGame() {
+            game.reset();
+            board.start();
+            updateStatus();
+        }
+
+        function updateStatus() {
+            let statusText = '';
+            const turn = game.turn() === 'w' ? 'Trắng' : 'Đen';
+            if (game.in_checkmate()) statusText = `CHIẾU BÍ! Bên ${turn} thua.`;
+            else if (game.in_draw()) statusText = `VÁN HÒA!`;
+            else statusText = `Đến lượt: ${turn} ${game.in_check() ? '(CHIẾU!)' : ''}`;
+            $('#status').text(statusText);
+        }
+
+        function changeMode() {
+            gameMode = $('#game-mode').val();
+            if (gameMode === 'online') {
+                $('#online-controls, #chat-container').show();
+            } else {
+                $('#online-controls, #chat-container').hide();
+            }
+            resetGame();
+        }
+
+        // Khởi tạo bàn cờ
+        board = Chessboard('myBoard', {
+            draggable: true,
+            position: 'start',
+            onDragStart: onDragStart,
+            onDrop: onDrop,
+            onSnapEnd: onSnapEnd,
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+        });
+
+        $(window).resize(() => board.resize());
     </script>
 </body>
 </html>
