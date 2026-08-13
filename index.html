@@ -27,15 +27,16 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
         
+        /* CHO PHÉP TRANG CUỘN TỰ DO TRÊN MÁY TÍNH */
         body { 
             background: var(--bg-main); 
             color: var(--text-light); 
             min-height: 100vh; 
-            padding: 10px; 
+            padding: 15px 10px; 
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            overflow-y: auto; /* Cho phép cuộn toàn trang */
+            overflow-y: auto !important; 
         }
 
         .modal-overlay {
@@ -51,16 +52,15 @@
         }
         .modal-box h2 { color: var(--accent-gold); margin-bottom: 15px; font-size: 1.4rem; }
 
-        header { text-align: center; margin-bottom: 8px; width: 100%; }
-        h1 { color: var(--accent-gold); font-size: 1.3rem; }
-        .user-badge { background: rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 20px; display: inline-block; margin-top: 4px; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.1); }
+        header { text-align: center; margin-bottom: 10px; width: 100%; }
+        h1 { color: var(--accent-gold); font-size: 1.4rem; }
+        .user-badge { background: rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 20px; display: inline-block; margin-top: 5px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.1); }
 
-        .main-container { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 400px; align-items: center; padding-bottom: 20px; }
+        .main-container { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 420px; align-items: center; padding-bottom: 30px; }
 
-        .board-box { width: 100%; aspect-ratio: 1 / 1; flex-shrink: 0; }
+        .board-box { width: 100%; aspect-ratio: 1 / 1; }
         #myBoard { width: 100% !important; height: 100% !important; }
 
-        /* BẢNG ĐIỀU KHIỂN CÓ THANH CUỘN ĐỂ THẤY NÚT THUA, VÁN MỚI, CẦU HÒA */
         .panel { 
             width: 100%; 
             background: var(--bg-card); 
@@ -69,31 +69,30 @@
             display: flex; 
             flex-direction: column; 
             gap: 8px; 
-            max-height: 300px; 
-            overflow-y: auto; /* Cho phép cuộn bên trong panel */
             border: 1px solid #3a506b;
         }
         
-        .status-box { background: #0b1329; padding: 6px; border-radius: 6px; text-align: center; font-weight: 600; color: var(--accent-blue); font-size: 0.85rem; flex-shrink: 0; }
+        .status-box { background: #0b1329; padding: 8px; border-radius: 6px; text-align: center; font-weight: 600; color: var(--accent-blue); font-size: 0.9rem; }
 
-        .input-group { display: flex; gap: 6px; width: 100%; flex-shrink: 0; }
+        .input-group { display: flex; gap: 6px; width: 100%; }
         input, select, button {
-            padding: 8px; border-radius: 6px; border: 1px solid #3a506b;
-            background: #0b1329; color: white; font-size: 0.8rem; outline: none;
+            padding: 9px; border-radius: 6px; border: 1px solid #3a506b;
+            background: #0b1329; color: white; font-size: 0.85rem; outline: none;
         }
         input { flex: 1; min-width: 0; }
         button { background: var(--accent-green); color: white; font-weight: 600; cursor: pointer; border: none; white-space: nowrap; }
+        button:hover { opacity: 0.9; }
         
         .chat-box {
             background: #0b1329; border-radius: 6px; padding: 6px;
-            height: 90px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0;
+            height: 100px; display: flex; flex-direction: column; gap: 4px;
         }
-        .chat-messages { flex: 1; overflow-y: auto; font-size: 0.75rem; display: flex; flex-direction: column; gap: 2px; }
-        .msg { padding: 2px 5px; border-radius: 4px; background: rgba(255,255,255,0.08); max-width: 90%; word-break: break-word; }
+        .chat-messages { flex: 1; overflow-y: auto; font-size: 0.8rem; display: flex; flex-direction: column; gap: 2px; }
+        .msg { padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); max-width: 90%; word-break: break-word; }
         .msg.me { background: #1d3557; align-self: flex-end; color: #a8dadc; }
         .msg.peer { background: #3a506b; align-self: flex-start; }
 
-        .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; flex-shrink: 0; margin-top: 4px; }
+        .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -145,7 +144,7 @@
 
             <div class="btn-grid">
                 <button style="background: var(--accent-red);" onclick="resignGame()">Đầu hàng</button>
-                <button style="background: var(--accent-gold; color: black;" onclick="offerDraw()">Cầu hòa</button>
+                <button style="background: var(--accent-gold); color: black;" onclick="offerDraw()">Cầu hòa</button>
                 <button style="background: #f77f00;" onclick="requestReset()">Ván mới</button>
             </div>
         </div>
@@ -273,9 +272,8 @@
         }
 
         function onDrop(source, target) {
-            // Kiểm tra nước đi có hợp lệ theo luật chess.js không
             let move = game.move({ from: source, to: target, promotion: 'q' });
-            if (move === null) return 'snapback'; // Trả về vị trí cũ nếu sai luật (ví dụ đang bị chiếu mà đi quân khác không cứu vua)
+            if (move === null) return 'snapback';
 
             updateStatus();
 
