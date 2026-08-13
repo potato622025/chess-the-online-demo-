@@ -3,96 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cờ Vua Trực Tuyến Pro</title>
-    <!-- Các link thư viện giữ nguyên -->
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <title>Cờ Vua Trực Tuyến</title>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    
     <style>
-        :root { --bg-main: #0b1329; --bg-card: #1c2541; --accent-gold: #ffc107; --accent-blue: #00b4d8; --accent-green: #2ec4b6; --accent-red: #e63946; }
-        body { background: var(--bg-main); color: white; font-family: 'Plus Jakarta Sans', sans-serif; padding: 10px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 9999; }
-        .modal-box { background: var(--bg-card); padding: 20px; border-radius: 12px; width: 90%; max-width: 320px; text-align: center; }
-        .board-box { width: 100%; max-width: 440px; aspect-ratio: 1/1; margin-bottom: 10px; }
-        .panel { width: 100%; max-width: 440px; background: var(--bg-card); padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; }
-        .btn-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
-        button { padding: 8px; border-radius: 6px; border: none; background: #3a506b; color: white; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
-        input, select { padding: 8px; border-radius: 6px; border: 1px solid #3a506b; background: #0b1329; color: white; }
+        body { background: #0b1329; color: white; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px; }
+        #myBoard { width: 100% !important; max-width: 400px; touch-action: none; }
+        .controls { width: 100%; max-width: 400px; margin-top: 10px; }
+        input { width: 100%; padding: 10px; border-radius: 5px; border: none; margin-bottom: 5px; }
+        button { width: 100%; padding: 10px; border-radius: 5px; border: none; background: #00b4d8; color: white; font-weight: bold; }
     </style>
 </head>
 <body>
-
-    <div class="modal-overlay" id="login-modal">
-        <div class="modal-box">
-            <h2>ĐĂNG NHẬP</h2>
-            <input type="text" id="username-input" placeholder="Tên của bạn..." style="width:100%; margin: 15px 0;">
-            <button style="width:100%; background:var(--accent-green)" onclick="login()">VÀO BÀN CỜ</button>
-        </div>
-    </div>
-
-    <div class="board-box"><div id="myBoard"></div></div>
-
-    <div class="panel">
-        <div id="status" style="text-align:center; color:var(--accent-blue); font-weight:bold;">Đang chờ...</div>
-        <div class="btn-group">
-            <button style="background:var(--accent-red)" onclick="resignGame()">Đầu hàng</button>
-            <button style="background:var(--accent-gold); color:#000" onclick="offerDraw()">Cầu hòa</button>
-            <button style="background:var(--accent-green)" onclick="requestReset()">Ván mới</button>
-        </div>
-        <div style="display:flex; gap:5px;">
-            <input type="text" id="peer-id-input" placeholder="ID đối thủ..." style="flex:1">
-            <button onclick="requestChallenge()">Thách đấu</button>
-        </div>
+    <div id="myBoard"></div>
+    <div class="controls">
+        <div id="my-id-display" style="text-align:center; margin-bottom:10px;">Đang lấy ID...</div>
+        <input type="text" id="target-id" placeholder="Nhập ID đối thủ...">
+        <button onclick="connectToPeer()">THÁCH ĐẤU</button>
     </div>
 
     <script>
-        let game = new Chess(), board = null, peer = null, conn = null, myUsername = "Player";
+        // Cấu hình STUN Server để xuyên tường lửa
+        const peerConfig = {
+            config: {
+                'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }]
+            }
+        };
 
-        function login() {
-            myUsername = $('#username-input').val() || "Player";
-            $('#login-modal').hide();
-            initPeer();
+        let peer = new Peer(peerConfig); // Tạo Peer không tiền tố
+        let conn = null;
+
+        peer.on('open', id => {
+            $('#my-id-display').text("ID CỦA BẠN: " + id);
+        });
+
+        peer.on('connection', c => {
+            conn = c;
+            setupConn();
+            alert("Đối thủ đã kết nối!");
+        });
+
+        function connectToPeer() {
+            let target = $('#target-id').val();
+            conn = peer.connect(target, peerConfig);
+            setupConn();
         }
 
-        function initPeer() {
-            let id = Math.floor(1000 + Math.random() * 9000);
-            peer = new Peer('chess-' + id);
-            peer.on('open', id => console.log("ID:", id));
-            peer.on('connection', c => {
-                c.on('data', data => {
-                    if (data.type === 'draw_request') {
-                        if (confirm('Đối thủ muốn CẦU HÒA. Bạn đồng ý không?')) {
-                            c.send({type: 'draw_accept'});
-                            alert('Ván đấu kết thúc với tỉ số HÒA!');
-                        }
-                    } else handleData(data, c);
-                });
-            });
+        function setupConn() {
+            conn.on('open', () => alert("Đã kết nối thành công!"));
+            conn.on('data', data => console.log("Nhận được:", data));
         }
 
-        function offerDraw() {
-            if (!conn) return alert('Chưa kết nối!');
-            conn.send({type: 'draw_request'});
-            alert('Đã gửi lời đề nghị hòa!');
-        }
-
-        function handleData(data, c) {
-            if (data.type === 'draw_accept') alert('Đối thủ đã ĐỒNG Ý hòa!');
-            // ... các xử lý cũ (move, resign, etc)
-        }
-        
-        // ... giữ nguyên các hàm cũ: requestChallenge, onDrop, etc.
-        const config = { draggable: true, position: 'start', onDrop: onDrop, pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png' };
-        board = Chessboard('myBoard', config);
-        function onDrop(s, t) { /* logic move */ }
-        function requestChallenge() { /* ... */ }
-        function resignGame() { /* ... */ }
-        function requestReset() { /* ... */ }
+        var board = Chessboard('myBoard', 'start');
     </script>
 </body>
 </html>
