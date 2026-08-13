@@ -27,7 +27,6 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
         
-        /* CHO PHÉP TRANG CUỘN TỰ DO TRÊN MÁY TÍNH */
         body { 
             background: var(--bg-main); 
             color: var(--text-light); 
@@ -137,7 +136,7 @@
                     <div class="msg" style="color: #8d99ae; text-align:center;">Hệ thống chat sẵn sàng</div>
                 </div>
                 <div class="input-group">
-                    <input type="text" id="chat-input" placeholder="Nhắn tin..." onkeypress="if(event.key==='Enter') sendChat()">
+                    <input type="text" id="chat-input" placeholder="Nhắn tin..." onkeydown="if(event.key==='Enter') { event.preventDefault(); sendChat(); }">
                     <button onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button>
                 </div>
             </div>
@@ -156,6 +155,7 @@
         let peer = null, conn = null;
         let myColor = 'w', gameMode = 'ai';
         let myUsername = "Player";
+        let lastChatText = ""; // Biến chống trùng lặp tin nhắn
 
         function login() {
             const name = $('#username-input').val().trim();
@@ -298,6 +298,15 @@
         function sendChat() {
             const txt = $('#chat-input').val().trim();
             if (!txt) return;
+            
+            // Chống gửi trùng lặp nội dung liên tiếp trong tích tắc
+            if (txt === lastChatText) {
+                $('#chat-input').val('');
+                return;
+            }
+            lastChatText = txt;
+            setTimeout(() => { lastChatText = ""; }, 500);
+
             addChat(myUsername, txt, 'me');
             if (conn && conn.open) {
                 conn.send({ type: 'chat', text: txt, sender: myUsername });
