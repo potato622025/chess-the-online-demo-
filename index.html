@@ -57,8 +57,17 @@
 
         .main-container { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 420px; align-items: center; padding-bottom: 30px; }
 
-        .board-box { width: 100%; aspect-ratio: 1 / 1; }
-        #myBoard { width: 100% !important; height: 100% !important; }
+        /* KHÓA CẢM ỨNG CUỘN TRANG RIÊNG CHO KHUNG BÀN CỜ ĐỂ KÉO QUÂN MƯỢT MÀ */
+        .board-box { 
+            width: 100%; 
+            aspect-ratio: 1 / 1; 
+            touch-action: none !important; 
+        }
+        #myBoard { 
+            width: 100% !important; 
+            height: 100% !important; 
+            touch-action: none !important; 
+        }
 
         .panel { 
             width: 100%; 
@@ -155,7 +164,7 @@
         let peer = null, conn = null;
         let myColor = 'w', gameMode = 'ai';
         let myUsername = "Player";
-        let lastChatText = ""; // Biến chống trùng lặp tin nhắn
+        let lastChatText = "";
 
         function login() {
             const name = $('#username-input').val().trim();
@@ -299,7 +308,6 @@
             const txt = $('#chat-input').val().trim();
             if (!txt) return;
             
-            // Chống gửi trùng lặp nội dung liên tiếp trong tích tắc
             if (txt === lastChatText) {
                 $('#chat-input').val('');
                 return;
