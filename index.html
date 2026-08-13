@@ -51,7 +51,6 @@
         }
         .modal-box h2 { color: var(--accent-gold); margin-bottom: 15px; font-size: 1.4rem; }
 
-        /* MÀN HÌNH HIỂN THỊ KẾT QUẢ THẮNG / THUA */
         #gameover-modal {
             display: none;
         }
@@ -118,12 +117,11 @@
         .msg.me { background: #1d3557; align-self: flex-end; color: #a8dadc; }
         .msg.peer { background: #3a506b; align-self: flex-start; }
 
-        .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 2px; }
+        .btn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 2px; }
     </style>
 </head>
 <body>
 
-    <!-- ĐĂNG NHẬP MODAL -->
     <div class="modal-overlay" id="login-modal">
         <div class="modal-box">
             <h2><i class="fa-solid fa-user-gear"></i> ĐĂNG NHẬP</h2>
@@ -132,7 +130,6 @@
         </div>
     </div>
 
-    <!-- KẾT QUẢ THẮNG THUA MODAL -->
     <div class="modal-overlay" id="gameover-modal">
         <div class="modal-box">
             <div id="gameover-icon" class="gameover-icon">🏆</div>
@@ -179,7 +176,13 @@
                 </div>
             </div>
 
-            <div class="btn-grid">
+            <!-- CÁC NÚT ĐIỀU KHIỂN TRẬN ĐẤU -->
+            <div class="btn-grid" id="ai-buttons">
+                <button style="background: var(--accent-blue);" onclick="undoMove()"><i class="fa-solid fa-rotate-left"></i> Đi lại (Undo)</button>
+                <button style="background: #f77f00;" onclick="requestReset()"><i class="fa-solid fa-rotate"></i> Ván mới</button>
+            </div>
+
+            <div class="btn-grid" id="online-buttons" style="display: none;">
                 <button style="background: var(--accent-red);" onclick="resignGame()">Đầu hàng</button>
                 <button style="background: var(--accent-gold); color: black;" onclick="offerDraw()">Cầu hòa</button>
                 <button style="background: #f77f00;" onclick="requestReset()">Ván mới</button>
@@ -229,8 +232,7 @@
                 if (data.type === 'challenge_request') {
                     if (confirm(`[${data.fromName}] muốn đấu online với bạn. Đồng ý?`)) {
                         $('#game-mode').val('online');
-                        gameMode = 'online';
-                        $('#online-controls, #chat-container').show();
+                        changeMode();
                         
                         myColor = 'b';
                         board.orientation('black');
@@ -330,6 +332,18 @@
             updateStatus();
         }
 
+        // HÀM HOÀN BƯỚC ĐI (UNDO) KHI ĐẤU VỚI MÁY
+        function undoMove() {
+            if (gameMode !== 'ai') return alert('Chỉ dùng tính năng đi lại khi đấu với Máy!');
+            if (game.game_over()) isGameOverShown = false;
+            
+            // Hoàn lại 2 bước (1 bước của bạn và 1 bước của máy)
+            game.undo();
+            game.undo();
+            board.position(game.fen());
+            updateStatus();
+        }
+
         function sendChat() {
             const txt = $('#chat-input').val().trim();
             if (!txt) return;
@@ -406,17 +420,14 @@
                 statusText = `CHIẾU BÍ! Bên ${turn} thua.`;
                 $('#status').text(statusText);
                 
-                // Xác định thắng hay thua dựa vào lượt đi và màu quân
                 if (gameMode === 'ai') {
-                    // Nếu chế độ AI, người chơi luôn cầm Trắng (w)
                     if (turn === 'Trắng') {
                         showGameOver('BẠN THUA 😢', 'Máy đã chiếu bí bạn.', '❌', 'var(--accent-red)');
                     } else {
                         showGameOver('BẠN THẮNG! 🎉', 'Bạn đã chiếu bí máy thành công.', '🏆', 'var(--accent-green)');
                     }
                 } else {
-                    // Chế độ Online
-                    const currentTurnColor = game.turn(); // 'w' hoặc 'b'
+                    const currentTurnColor = game.turn();
                     if (currentTurnColor === myColor) {
                         showGameOver('BẠN THUA 😢', 'Bạn đã bị đối thủ chiếu bí.', '❌', 'var(--accent-red)');
                     } else {
@@ -438,9 +449,11 @@
         function changeMode() {
             gameMode = $('#game-mode').val();
             if (gameMode === 'online') {
-                $('#online-controls, #chat-container').show();
+                $('#online-controls, #chat-container, #online-buttons').show();
+                $('#ai-buttons').hide();
             } else {
-                $('#online-controls, #chat-container').hide();
+                $('#online-controls, #chat-container, #online-buttons').hide();
+                $('#ai-buttons').show();
                 if (conn) {
                     conn.close();
                     conn = null;
