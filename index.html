@@ -27,7 +27,6 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
         
-        /* KHÓA HOÀN TOÀN CUỘN TRANG KHI CHẠM VÀO BODY VÀ BÀN CỜ */
         body { 
             background: var(--bg-main); 
             color: var(--text-light); 
@@ -36,8 +35,8 @@
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            overflow: hidden; /* Chống cuộn toàn trang */
-            touch-action: none; /* Khóa mọi thao tác cảm ứng mặc định */
+            overflow: hidden; 
+            touch-action: none; 
         }
 
         .modal-overlay {
@@ -165,13 +164,18 @@
             peer.on('connection', connection => {
                 connection.on('data', data => {
                     if (data.type === 'challenge_request') {
-                        if (confirm(`[${data.fromName}] muốn đấu. Đồng ý?`)) {
+                        if (confirm(`[${data.fromName}] muốn đấu online với bạn. Đồng ý?`)) {
+                            // Tự động chuyển chế độ sang online để tránh lỗi xung đột với AI
+                            $('#game-mode').val('online');
+                            changeMode();
+                            
                             conn = connection;
                             myColor = 'b';
                             board.orientation('black');
                             setupConnection();
                             conn.send({ type: 'challenge_response', accepted: true, name: myUsername });
                             resetGame();
+                            alert(`Đã kết nối với [${data.fromName}]! Bạn cầm quân Đen.`);
                         } else {
                             connection.send({ type: 'challenge_response', accepted: false });
                         }
@@ -185,6 +189,10 @@
         function requestChallenge() {
             const targetID = $('#peer-id-input').val().trim();
             if (!targetID) return alert('Nhập ID đối thủ!');
+            
+            // Chuyển chế độ sang online
+            gameMode = 'online';
+            
             const tempConn = peer.connect('chess-' + targetID);
             tempConn.on('open', () => tempConn.send({ type: 'challenge_request', fromName: myUsername }));
             tempConn.on('data', data => {
@@ -194,13 +202,16 @@
                     board.orientation('white');
                     setupConnection();
                     resetGame();
-                    alert(`Đã kết nối với [${data.name}]!`);
+                    alert(`Đã kết nối thành công với [${data.name}]! Bạn cầm quân Trắng.`);
                 }
             });
         }
 
         function setupConnection() {
-            conn.on('data', data => handleIncomingData(data));
+            if (conn) {
+                conn.off('data'); // Xóa các sự kiện cũ tránh lặp
+                conn.on('data', data => handleIncomingData(data));
+            }
         }
 
         function handleIncomingData(data) {
@@ -213,31 +224,43 @@
             } else if (data.type === 'resign') {
                 alert('Đối thủ đầu hàng! Bạn thắng 🎉');
                 resetGame();
+            } else if (data.type === 'draw_request') {
+                if (confirm('Đối thủ cầu hòa. Đồng ý?')) {
+                    conn.send({ type: 'draw_accept' });
+                    alert('Ván đấu hòa!');
+                    resetGame();
+                }
+            } else if (data.type === 'draw_accept') {
+                alert('Đối thủ đồng ý hòa!');
+                resetGame();
+            } else if (data.type === 'reset') {
+                alert('Đối thủ muốn tạo ván mới!');
+                resetGame();
             }
         }
 
-        // --- KIỂM TRA LUẬT CỜ CHẶT CHẼ ---
         function onDragStart(source, piece) {
             if (game.game_over()) return false;
-            // Kiểm tra lượt đi (Trắng hay Đen)
+            
+            // Nếu đang đấu online, kiểm tra xem có đúng lượt của mình không và đã có kết nối chưa
             if (gameMode === 'online') {
                 if (!conn) return false;
                 if ((game.turn() === 'w' && myColor !== 'w') || (game.turn() === 'b' && myColor !== 'b')) return false;
             }
+            
+            // Kiểm tra màu quân cờ theo lượt
             if ((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
                 return false;
             }
         }
 
         function onDrop(source, target) {
-            // Kiểm tra nước đi theo đúng luật chess.js
             let move = game.move({ from: source, to: target, promotion: 'q' });
-            
-            // Nếu đi bậy / sai luật -> Trả quân về vị trí cũ ngay lập tức
-            if (move === null) return 'snapback';
+            if (move === null) return 'snapback'; // Đi sai luật -> trả về
 
             updateStatus();
 
+            // Phân biệt rõ hành động dựa vào gameMode hiện tại
             if (gameMode === 'online' && conn) {
                 conn.send({ type: 'move', move: { from: source, to: target, promotion: 'q' } });
             } else if (gameMode === 'ai' && !game.game_over()) {
@@ -248,6 +271,7 @@
         function onSnapEnd() { board.position(game.fen()); }
 
         function makeAIMove() {
+            if (gameMode !== 'ai') return; // Chặn tuyệt đối không cho AI đánh nếu đang chơi online
             const moves = game.moves();
             if (moves.length === 0) return;
             game.move(moves[Math.floor(Math.random() * moves.length)]);
@@ -282,11 +306,19 @@
             } else alert('Chỉ dùng được khi đấu online!');
         }
 
-        function requestReset() { resetGame(); }
+        function requestReset() { 
+            if (gameMode === 'online' && conn) conn.send({ type: 'reset' });
+            resetGame(); 
+        }
 
         function resetGame() {
             game.reset();
             board.start();
+            if (gameMode === 'online') {
+                board.orientation(myColor === 'w' ? 'white' : 'black');
+            } else {
+                board.orientation('white');
+            }
             updateStatus();
         }
 
@@ -301,8 +333,12 @@
 
         function changeMode() {
             gameMode = $('#game-mode').val();
-            if (gameMode === 'online') $('#online-controls, #chat-container').show();
-            else $('#online-controls, #chat-container').hide();
+            if (gameMode === 'online') {
+                $('#online-controls, #chat-container').show();
+            } else {
+                $('#online-controls, #chat-container').hide();
+                conn = null; // Ngắt kết nối online khi chuyển về đấu máy
+            }
             resetGame();
         }
 
