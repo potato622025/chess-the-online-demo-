@@ -51,13 +51,31 @@
         }
         .modal-box h2 { color: var(--accent-gold); margin-bottom: 15px; font-size: 1.4rem; }
 
+        /* MÀN HÌNH HIỂN THỊ KẾT QUẢ THẮNG / THUA */
+        #gameover-modal {
+            display: none;
+        }
+        .gameover-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        #gameover-title {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        #gameover-desc {
+            font-size: 0.9rem;
+            color: #8d99ae;
+            margin-bottom: 20px;
+        }
+
         header { text-align: center; margin-bottom: 10px; width: 100%; }
         h1 { color: var(--accent-gold); font-size: 1.4rem; }
         .user-badge { background: rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 20px; display: inline-block; margin-top: 5px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.1); }
 
         .main-container { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 420px; align-items: center; padding-bottom: 30px; }
 
-        /* KHÓA CẢM ỨNG CUỘN TRANG RIÊNG CHO KHUNG BÀN CỜ ĐỂ KÉO QUÂN MƯỢT MÀ */
         .board-box { 
             width: 100%; 
             aspect-ratio: 1 / 1; 
@@ -105,11 +123,22 @@
 </head>
 <body>
 
+    <!-- ĐĂNG NHẬP MODAL -->
     <div class="modal-overlay" id="login-modal">
         <div class="modal-box">
             <h2><i class="fa-solid fa-user-gear"></i> ĐĂNG NHẬP</h2>
             <input type="text" id="username-input" placeholder="Tên người chơi..." style="width: 100%; margin-bottom: 12px;" onkeypress="if(event.key==='Enter') login()">
             <button style="width: 100%; padding: 10px;" onclick="login()">VÀO GAME</button>
+        </div>
+    </div>
+
+    <!-- KẾT QUẢ THẮNG THUA MODAL -->
+    <div class="modal-overlay" id="gameover-modal">
+        <div class="modal-box">
+            <div id="gameover-icon" class="gameover-icon">🏆</div>
+            <h2 id="gameover-title">KẾT QUẢ</h2>
+            <div id="gameover-desc">Ván đấu đã kết thúc</div>
+            <button style="width: 100%; padding: 10px; background: var(--accent-green);" onclick="closeGameOverModal()">Chơi Ván Mới</button>
         </div>
     </div>
 
@@ -165,6 +194,7 @@
         let myColor = 'w', gameMode = 'ai';
         let myUsername = "Player";
         let lastChatText = "";
+        let isGameOverShown = false;
 
         function login() {
             const name = $('#username-input').val().trim();
@@ -252,19 +282,15 @@
             } else if (data.type === 'chat') {
                 addChat(data.sender, data.text, 'peer');
             } else if (data.type === 'resign') {
-                alert('Đối thủ đầu hàng! Bạn thắng 🎉');
-                resetGame();
+                showGameOver('BẠN THẮNG! 🎉', 'Đối thủ đã xin đầu hàng.', '🏆', 'var(--accent-green)');
             } else if (data.type === 'draw_request') {
                 if (confirm('Đối thủ cầu hòa. Đồng ý?')) {
                     conn.send({ type: 'draw_accept' });
-                    alert('Ván đấu hòa!');
-                    resetGame();
+                    showGameOver('VÁN HÒA', 'Hai người đã đồng ý hòa trận.', '🤝', 'var(--accent-gold)');
                 }
             } else if (data.type === 'draw_accept') {
-                alert('Đối thủ đồng ý hòa!');
-                resetGame();
+                showGameOver('VÁN HÒA', 'Đối thủ đã đồng ý hòa.', '🤝', 'var(--accent-gold)');
             } else if (data.type === 'reset') {
-                alert('Đối thủ muốn tạo ván mới!');
                 resetGame();
             }
         }
@@ -328,16 +354,16 @@
         }
 
         function resignGame() {
-            if (confirm('Nhận thua?')) {
+            if (confirm('Bạn có chắc chắn muốn đầu hàng?')) {
                 if (conn && conn.open) conn.send({ type: 'resign' });
-                resetGame();
+                showGameOver('BẠN THUA 😢', 'Bạn đã nhận thua ván đấu này.', '❌', 'var(--accent-red)');
             }
         }
 
         function offerDraw() {
             if (conn && conn.open) {
                 conn.send({ type: 'draw_request' });
-                alert('Đã gửi yêu cầu hòa!');
+                alert('Đã gửi yêu cầu cầu hòa!');
             } else alert('Chỉ dùng được khi đấu online!');
         }
 
@@ -349,6 +375,7 @@
         function resetGame() {
             game.reset();
             board.start();
+            isGameOverShown = false;
             if (gameMode === 'online') {
                 board.orientation(myColor === 'w' ? 'white' : 'black');
             } else {
@@ -357,12 +384,54 @@
             updateStatus();
         }
 
+        function showGameOver(title, desc, icon, color) {
+            if (isGameOverShown) return;
+            isGameOverShown = true;
+            $('#gameover-icon').text(icon);
+            $('#gameover-title').text(title).css('color', color);
+            $('#gameover-desc').text(desc);
+            $('#gameover-modal').fadeIn();
+        }
+
+        function closeGameOverModal() {
+            $('#gameover-modal').fadeOut();
+            requestReset();
+        }
+
         function updateStatus() {
             let statusText = '';
             const turn = game.turn() === 'w' ? 'Trắng' : 'Đen';
-            if (game.in_checkmate()) statusText = `CHIẾU BÍ! Bên ${turn} thua.`;
-            else if (game.in_draw()) statusText = `VÁN HÒA!`;
-            else statusText = `Đến lượt: ${turn} ${game.in_check() ? '(CHIẾU!)' : ''}`;
+            
+            if (game.in_checkmate()) {
+                statusText = `CHIẾU BÍ! Bên ${turn} thua.`;
+                $('#status').text(statusText);
+                
+                // Xác định thắng hay thua dựa vào lượt đi và màu quân
+                if (gameMode === 'ai') {
+                    // Nếu chế độ AI, người chơi luôn cầm Trắng (w)
+                    if (turn === 'Trắng') {
+                        showGameOver('BẠN THUA 😢', 'Máy đã chiếu bí bạn.', '❌', 'var(--accent-red)');
+                    } else {
+                        showGameOver('BẠN THẮNG! 🎉', 'Bạn đã chiếu bí máy thành công.', '🏆', 'var(--accent-green)');
+                    }
+                } else {
+                    // Chế độ Online
+                    const currentTurnColor = game.turn(); // 'w' hoặc 'b'
+                    if (currentTurnColor === myColor) {
+                        showGameOver('BẠN THUA 😢', 'Bạn đã bị đối thủ chiếu bí.', '❌', 'var(--accent-red)');
+                    } else {
+                        showGameOver('BẠN THẮNG! 🎉', 'Bạn đã chiếu bí đối thủ.', '🏆', 'var(--accent-green)');
+                    }
+                }
+                return;
+            } else if (game.in_draw()) {
+                statusText = `VÁN HÒA!`;
+                $('#status').text(statusText);
+                showGameOver('VÁN HÒA', 'Trận đấu kết thúc với kết quả hòa.', '🤝', 'var(--accent-gold)');
+                return;
+            } else {
+                statusText = `Đến lượt: ${turn} ${game.in_check() ? '(CHIẾU!)' : ''}`;
+            }
             $('#status').text(statusText);
         }
 
