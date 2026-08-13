@@ -51,23 +51,10 @@
         }
         .modal-box h2 { color: var(--accent-gold); margin-bottom: 15px; font-size: 1.4rem; }
 
-        #gameover-modal {
-            display: none;
-        }
-        .gameover-icon {
-            font-size: 3rem;
-            margin-bottom: 10px;
-        }
-        #gameover-title {
-            font-size: 1.5rem;
-            margin-bottom: 8px;
-            font-weight: 700;
-        }
-        #gameover-desc {
-            font-size: 0.9rem;
-            color: #8d99ae;
-            margin-bottom: 20px;
-        }
+        #gameover-modal { display: none; }
+        .gameover-icon { font-size: 3rem; margin-bottom: 10px; }
+        #gameover-title { font-size: 1.5rem; margin-bottom: 8px; font-weight: 700; }
+        #gameover-desc { font-size: 0.9rem; color: #8d99ae; margin-bottom: 20px; }
 
         header { text-align: center; margin-bottom: 10px; width: 100%; }
         h1 { color: var(--accent-gold); font-size: 1.4rem; }
@@ -85,39 +72,6 @@
             width: 100% !important; 
             height: 100% !important; 
             touch-action: none !important; 
-        }
-
-        /* HIỆU ỨNG ANIMATION RIÊNG CHO TỪNG LOẠI QUÂN CỜ */
-        @keyframes knightJump {
-            0% { transform: scale(1) translate(0, 0); }
-            50% { transform: scale(1.25) translate(calc(var(--dx) * 0.5), -35px); filter: drop-shadow(0 15px 10px rgba(0,0,0,0.6)); }
-            100% { transform: scale(1) translate(0, 0); }
-        }
-
-        @keyframes pieceSlide {
-            0% { transform: translate(0, 0); }
-            100% { transform: translate(0, 0); }
-        }
-
-        @keyframes pieceCapture {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.5; filter: brightness(1.5) drop-shadow(0 0 10px var(--accent-red)); }
-            100% { transform: scale(0); opacity: 0; }
-        }
-
-        .anim-knight {
-            animation: knightJump 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-            z-index: 100;
-        }
-
-        .anim-slide {
-            animation: pieceSlide 0.3s ease-in-out forwards;
-            z-index: 100;
-        }
-
-        .anim-capture {
-            animation: pieceCapture 0.35s ease-out forwards;
-            z-index: 90;
         }
 
         .panel { 
@@ -344,15 +298,12 @@
         }
 
         function onDrop(source, target) {
-            let pieceObj = game.get(source);
-            let targetObj = game.get(target);
             let moveCheck = game.move({ from: source, to: target, promotion: 'q' });
-            
             if (moveCheck === null) return 'snapback';
-            game.undo(); // Hoàn lại tạm thời để thực hiện hiệu ứng animation trực quan
+            game.undo(); // Hoàn lại tạm thời để chạy hiệu ứng animation
 
             animateAndExecuteMove(source, target, () => {
-                let move = game.move({ from: source, to: target, promotion: 'q' });
+                game.move({ from: source, to: target, promotion: 'q' });
                 board.position(game.fen());
                 updateStatus();
 
@@ -366,52 +317,57 @@
 
         function onSnapEnd() { board.position(game.fen()); }
 
-        // HÀM XỬ LÝ ANIMATION RIÊNG CHO TỪNG QUÂN CỜ
+        // HIỆU ỨNG ANIMATION RIÊNG BIỆT DÙNG JS ANIMATE
         function animateAndExecuteMove(source, target, callback) {
             let pieceObj = game.get(source);
-            if (!pieceObj) {
-                callback();
-                return;
-            }
-
             let $sourceSquare = $(`#myBoard .square-${source}`);
             let $targetSquare = $(`#myBoard .square-${target}`);
             let $pieceImg = $sourceSquare.find('img');
 
-            if ($pieceImg.length === 0) {
+            if (!pieceObj || $pieceImg.length === 0) {
                 callback();
                 return;
             }
 
-            // Tính toán khoảng cách dịch chuyển cho quân Mã
-            let fileFrom = source.charCodeAt(0);
-            let rankFrom = parseInt(source[1]);
-            let fileTo = target.charCodeAt(0);
-            let rankTo = parseInt(target[1]);
-            let dx = (fileTo - fileFrom) * $sourceSquare.width();
-            let dy = (rankFrom - rankTo) * $sourceSquare.height();
+            // Tạo quân cờ ảo bay trên bàn cờ để chạy animation
+            let $clone = $pieceImg.clone().appendTo('#myBoard').css({
+                position: 'absolute',
+                zIndex: 1000,
+                left: $sourceSquare.position().left,
+                top: $sourceSquare.position().top,
+                width: $sourceSquare.width(),
+                height: $sourceSquare.height()
+            });
 
-            $pieceImg.css('--dx', dx + 'px');
+            // Ẩn quân gốc tạm thời
+            $pieceImg.hide();
 
-            // Kiểm tra loại quân để gán hiệu ứng tương ứng
-            if (pieceObj.type === 'n') {
-                // Quân Mã: Nhảy hình chữ L
-                $pieceImg.addClass('anim-knight');
-            } else {
-                // Các quân khác: Trượt mượt mà
-                $pieceImg.addClass('anim-slide');
-            }
+            let targetPos = $targetSquare.position();
 
-            // Nếu ô đích có quân bị ăn, thêm hiệu ứng biến mất cho quân bị ăn
+            // Xử lý hiệu ứng quân bị ăn (nếu có)
             let $targetPieceImg = $targetSquare.find('img');
             if ($targetPieceImg.length > 0 && game.get(target)) {
-                $targetPieceImg.addClass('anim-capture');
+                $targetPieceImg.fadeOut(250);
             }
 
-            setTimeout(() => {
-                $pieceImg.removeClass('anim-knight anim-slide');
-                callback();
-            }, 350);
+            if (pieceObj.type === 'n') {
+                // QUÂN MÃ: Hiệu ứng nhảy vọt hình chữ L lên cao rồi đáp xuống
+                let midLeft = (targetPos.left + $sourceSquare.position().left) / 2;
+                let midTop = Math.min(targetPos.top, $sourceSquare.position().top) - 30;
+
+                $clone.animate({ left: midLeft, top: midTop }, 180, 'linear', function() {
+                    $(this).animate({ left: targetPos.left, top: targetPos.top }, 180, 'linear', function() {
+                        $(this).remove();
+                        callback();
+                    });
+                });
+            } else {
+                // CÁC QUÂN KHÁC: Hiệu ứng trượt lướt mượt mà
+                $clone.animate({ left: targetPos.left, top: targetPos.top }, 250, 'easeInOutQuad', function() {
+                    $(this).remove();
+                    callback();
+                });
+            }
         }
 
         function makeAIMove() {
