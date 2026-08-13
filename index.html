@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cờ Vua Trực Tuyến - Multiplayer & AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Chess Engine & PeerJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --accent-gold: #fbbf24;
+            --accent-blue: #38bdf8;
+            --accent-green: #10b981;
+            --board-light: #f0d9b5;
+            --board-dark: #b58863;
+            --board-highlight: rgba(255, 255, 0, 0.4);
+            --board-legal: rgba(16, 185, 129, 0.5);
+            --board-lastmove: rgba(56, 189, 248, 0.4);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body { background-color: var(--bg-main); color: var(--text-main); font-family: 'Plus Jakarta Sans', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+
+        /* AUTH MODAL */
+        .auth-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.95); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .auth-card { background: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
+        .auth-title { font-size: 24px; font-weight: 700; color: var(--accent-gold); text-align: center; margin-bottom: 20px; }
+        .auth-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .auth-tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; color: var(--text-muted); font-weight: 600; }
+        .auth-tab.active { color: var(--accent-gold); border-bottom: 2px solid var(--accent-gold); }
+        .input-group { margin-bottom: 16px; }
+        .input-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+        .input-group input { width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; font-size: 14px; outline: none; }
+        .auth-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; border-radius: 8px; color: #fff; font-weight: 700; cursor: pointer; margin-top: 10px; }
+
+        /* HEADER & LAYOUT */
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 28px; color: var(--accent-gold); display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .user-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); padding: 6px 14px; border-radius: 20px; font-size: 13px; color: var(--accent-blue); margin-top: 10px; }
+
+        .game-wrapper { display: flex; gap: 25px; max-width: 1100px; width: 100%; background: var(--bg-card); padding: 24px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .board-container { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .player-bar { width: 500px; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: rgba(15, 23, 42, 0.6); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
+
+        #chessboard { width: 500px; height: 500px; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); border-radius: 8px; overflow: hidden; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4); }
+        .square { display: flex; align-items: center; justify-content: center; font-size: 42px; position: relative; cursor: pointer; }
+        .square.light { background-color: var(--board-light); }
+        .square.dark { background-color: var(--board-dark); }
+        .square.selected { background-color: var(--board-highlight) !important; }
+        .square.last-move { background-color: var(--board-lastmove) !important; }
+        .square.legal-move::after { content: ''; width: 16px; height: 16px; background-color: var(--board-legal); border-radius: 50%; position: absolute; }
+        .square.legal-capture { box-shadow: inset 0 0 0 4px var(--board-legal); }
+        .square.in-check { background-color: rgba(239, 68, 68, 0.7) !important; }
+
+        .sidebar { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+        .panel-box { background: rgba(15, 23, 42, 0.6); border-radius: 12px; padding: 16px; border: 1px solid rgba(255, 255, 255, 0.08); }
+        .panel-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .control-group { display: flex; flex-direction: column; gap: 10px; }
+        select, button, input[type="text"] { background: #334155; color: #fff; border: 1px solid rgba(255, 255, 255, 0.1); padding: 10px 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; }
+        button { font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        button.primary { background: linear-gradient(135deg, #f59e0b, #d97706); border: none; }
+        button.success { background: linear-gradient(135deg, #10b981, #059669); border: none; }
+        .status-box { text-align: center; padding: 12px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; color: var(--accent-blue); font-weight: 600; }
+        .move-history { height: 150px; overflow-y: auto; display: grid; grid-template-columns: 40px 1fr 1fr; gap: 4px; font-size: 13px; font-family: monospace; }
+        .history-row-num { color: var(--text-muted); text-align: right; padding-right: 8px; }
+        .history-move { background: rgba(255, 255, 255, 0.03); padding: 4px 8px; border-radius: 4px; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.75); display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-card { background: var(--bg-card); padding: 24px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.2); text-align: center; max-width: 360px; width: 100%; }
+        .modal-buttons { display: flex; gap: 12px; margin-top: 18px; }
+    </style>
+</head>
+<body>
+
+    <!-- MODAL ĐĂNG NHẬP / ĐĂNG KÝ -->
+    <div class="auth-overlay" id="auth-modal">
+        <div class="auth-card">
+            <div class="auth-title"><i class="fa-solid fa-chess"></i> CỜ VUA ONLINE</div>
+            <div class="auth-tabs">
+                <div class="auth-tab active" id="tab-login" onclick="switchAuthMode('login')">Đăng Nhập</div>
+                <div class="auth-tab" id="tab-register" onclick="switchAuthMode('register')">Đăng Ký</div>
+            </div>
+
+            <form id="auth-form" onsubmit="handleAuth(event)">
+                <div class="input-group">
+                    <label>Tên tài khoản:</label>
+                    <input type="text" id="auth-username" required placeholder="Nhập tên...">
+                </div>
+                <div class="input-group">
+                    <label>Mật khẩu:</label>
+                    <input type="password" id="auth-password" required placeholder="Nhập mật khẩu...">
+                </div>
+                <button type="submit" class="auth-btn" id="auth-submit-btn">Đăng Nhập</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- TIÊU ĐỀ KHU VỰC CHƠI -->
+    <div class="header">
+        <h1><i class="fa-solid fa-chess-king"></i> GAME CỜ VUA TRỰC TUYẾN</h1>
+        <div class="user-badge" id="user-badge-info" style="display: none;">
+            <i class="fa-solid fa-user-check"></i>
+            <span id="user-display-name">...</span> | 
+            <strong>ID CỦA BẠN: <span id="user-display-id" style="color:var(--accent-gold);">---</span></strong>
+        </div>
+    </div>
+
+    <div class="game-wrapper">
+        <div class="board-container">
+            <div class="player-bar">
+                <div id="black-name" style="font-weight:600;">Đối Thủ (Đen)</div>
+            </div>
+
+            <div id="chessboard"></div>
+
+            <div class="player-bar">
+                <div id="white-name" style="font-weight:600; color:#fbbf24;">Bạn (Trắng)</div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="status-box" id="status-text">Đang tải game...</div>
+
+            <div class="panel-box">
+                <div class="panel-title"><i class="fa-solid fa-gamepad"></i> Chế Độ Chơi</div>
+                <div class="control-group">
+                    <select id="mode-select" onchange="changeMode()">
+                        <option value="vs-ai">Chơi với Máy (Bot AI)</option>
+                        <option value="online">Đấu Trực Tuyến (Thách đấu ID)</option>
+                    </select>
+
+                    <div id="online-controls" style="display: none;">
+                        <label style="font-size:12px; color:#94a3b8;">Nhập ID đối thủ để thách đấu:</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="opponent-id-input" placeholder="Ví dụ: 1002" style="flex:1;">
+                            <button class="success" onclick="sendChallenge()"><i class="fa-solid fa-paper-plane"></i> Đấu</button>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button class="primary" onclick="initGame()" style="flex:1;"><i class="fa-solid fa-rotate-right"></i> Ván Mới</button>
+                        <button onclick="handleUndo()" style="flex:1;"><i class="fa-solid fa-rotate-left"></i> Hoàn Nước</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-box" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="panel-title"><i class="fa-solid fa-list"></i> Lịch Sử Nước Đi</div>
+                <div class="move-history" id="move-history"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL LỜI MỜI THÁCH ĐẤU -->
+    <div class="modal-overlay" id="invite-modal">
+        <div class="modal-card">
+            <h3 style="color:var(--accent-gold); margin-bottom:10px;">Lời Mời Thách Đấu!</h3>
+            <p id="invite-msg">Người chơi muốn thách đấu với bạn.</p>
+            <div class="modal-buttons">
+                <button class="success" style="flex:1;" onclick="acceptChallenge()"><i class="fa-solid fa-check"></i> Đồng Ý</button>
+                <button style="flex:1; background:#ef4444; border:none;" onclick="declineChallenge()"><i class="fa-solid fa-xmark"></i> Từ Chối</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PIECE_SYMBOLS = { 'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔' };
+        
+        let authMode = 'login';
+        let currentUser = null;
+        const game = new Chess();
+        let gameMode = 'vs-ai';
+        let myColor = 'w';
+        let peer = null, conn = null, pendingInviteConn = null;
+        let selectedSquare = null, legalMoves = [];
+
+        /* KHỞI TẠO TÀI KHOẢN VÀ ID */
+        function switchAuthMode(mode) {
+            authMode = mode;
+            document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+            document.getElementById('tab-register').classList.toggle('active', mode === 'register');
+            document.getElementById('auth-submit-btn').innerText = mode === 'login' ? 'Đăng Nhập' : 'Đăng Ký Khởi Tạo ID';
+        }
+
+        function handleAuth(e) {
+            e.preventDefault();
+            const u = document.getElementById('auth-username').value.trim();
+            const p = document.getElementById('auth-password').value.trim();
+            let users = JSON.parse(localStorage.getItem('chess_users') || '{}');
+
+            if (authMode === 'register') {
+                if (users[u]) return alert('Tài khoản đã tồn tại!');
+                const newId = (1001 + Object.keys(users).length).toString();
+                users[u] = { password: p, id: newId };
+                localStorage.setItem('chess_users', JSON.stringify(users));
+                currentUser = { username: u, id: newId };
+                alert(`Đăng ký thành công! Số ID của bạn là: ${newId}`);
+            } else {
+                if (!users[u] || users[u].password !== p) return alert('Sai tên hoặc mật khẩu!');
+                currentUser = { username: u, id: users[u].id };
+            }
+
+            document.getElementById('auth-modal').style.display = 'none';
+            document.getElementById('user-badge-info').style.display = 'inline-flex';
+            document.getElementById('user-display-name').innerText = currentUser.username;
+            document.getElementById('user-display-id').innerText = currentUser.id;
+
+            initPeer();
+            initGame();
+        }
+
+        /* PEERJS KẾT NỐI ONLINE P2P */
+        function initPeer() {
+            peer = new Peer('chess-app-id-' + currentUser.id);
+
+            peer.on('connection', (c) => {
+                pendingInviteConn = c;
+                c.on('data', (data) => {
+                    if (data.type === 'challenge') {
+                        document.getElementById('invite-msg').innerText = `ID ${data.fromId} (${data.fromUser}) thách đấu với bạn!`;
+                        document.getElementById('invite-modal').classList.add('active');
+                    } else if (data.type === 'accept') {
+                        conn = c;
+                        setupConnection();
+                        myColor = 'w';
+                        alert('Đối thủ đã ĐỒNG Ý! Bạn đi TRẮNG.');
+                        initGame();
+                    } else if (data.type === 'decline') {
+                        alert('Đối thủ đã từ chối!');
+                    } else if (data.type === 'move') {
+                        game.move(data.move);
+                        renderBoard();
+                        updateStatus();
+                    } else if (data.type === 'undo') {
+                        game.undo();
+                        renderBoard();
+                        updateStatus();
+                    }
+                });
+            });
+        }
+
+        function sendChallenge() {
+            const oppId = document.getElementById('opponent-id-input').value.trim();
+            if (!oppId) return alert('Vui lòng nhập ID!');
+            if (oppId === currentUser.id) return alert('Không thể tự thách đấu!');
+
+            conn = peer.connect('chess-app-id-' + oppId);
+            conn.on('open', () => {
+                conn.send({ type: 'challenge', fromId: currentUser.id, fromUser: currentUser.username });
+                document.getElementById('status-text').innerText = `Đã gửi lời mời tới ID ${oppId}...`;
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'accept') {
+                    setupConnection();
+                    myColor = 'w';
+                    alert('Đối thủ ĐỒNG Ý! Bạn đi TRẮNG.');
+                    initGame();
+                } else if (data.type === 'decline') {
+                    alert('Đối thủ TỪ CHỐI lời mời!');
+                } else if (data.type === 'move') {
+                    game.move(data.move);
+                    renderBoard();
+                    updateStatus();
+                } else if (data.type === 'undo') {
+                    game.undo();
+                    renderBoard();
+                    updateStatus();
+                }
+            });
+        }
+
+        function acceptChallenge() {
+            document.getElementById('invite-modal').classList.remove('active');
+            conn = pendingInviteConn;
+            conn.send({ type: 'accept' });
+            setupConnection();
+            myColor = 'b';
+            initGame();
+        }
+
+        function declineChallenge() {
+            document.getElementById('invite-modal').classList.remove('active');
+            if (pendingInviteConn) pendingInviteConn.send({ type: 'decline' });
+        }
+
+        function setupConnection() {
+            document.getElementById('mode-select').value = 'online';
+            changeMode();
+        }
+
+        /* QUẢN LÝ BÀN CỜ & ĐI NƯỚC */
+        function changeMode() {
+            gameMode = document.getElementById('mode-select').value;
+            document.getElementById('online-controls').style.display = gameMode === 'online' ? 'block' : 'none';
+            initGame();
+        }
+
+        function initGame() {
+            game.reset();
+            selectedSquare = null;
+            legalMoves = [];
+            
+            if (gameMode === 'vs-ai') {
+                myColor = 'w';
+                document.getElementById('black-name').innerText = 'Máy (Bot AI)';
+                document.getElementById('white-name').innerText = currentUser ? `${currentUser.username} (Bạn)` : 'Bạn';
+            } else {
+                document.getElementById('black-name').innerText = myColor === 'b' ? `${currentUser.username} (Bạn)` : 'Đối Thủ (Online)';
+                document.getElementById('white-name').innerText = myColor === 'w' ? `${currentUser.username} (Bạn)` : 'Đối Thủ (Online)';
+            }
+
+            renderBoard();
+            updateStatus();
+        }
+
+        function renderBoard() {
+            const boardEl = document.getElementById('chessboard');
+            boardEl.innerHTML = '';
+            const board = game.board();
+            const history = game.history({ verbose: true });
+            const lastMove = history.length > 0 ? history[history.length - 1] : null;
+            const isFlipped = (gameMode === 'online' && myColor === 'b');
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const row = isFlipped ? 7 - r : r;
+                    const col = isFlipped ? 7 - c : c;
+                    const squareSquare = String.fromCharCode(97 + col) + (8 - row);
+                    
+                    const squareEl = document.createElement('div');
+                    squareEl.classList.add('square', (row + col) % 2 === 0 ? 'light' : 'dark');
+
+                    if (selectedSquare === squareSquare) squareEl.classList.add('selected');
+                    if (lastMove && (lastMove.from === squareSquare || lastMove.to === squareSquare)) squareEl.classList.add('last-move');
+                    if (legalMoves.includes(squareSquare)) squareEl.classList.add(game.get(squareSquare) ? 'legal-capture' : 'legal-move');
+
+                    const piece = board[row][col];
+                    if (piece) {
+                        const pieceEl = document.createElement('div');
+                        pieceEl.innerText = PIECE_SYMBOLS[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
+                        pieceEl.style.color = piece.color === 'w' ? '#ffffff' : '#1e293b';
+                        squareEl.appendChild(pieceEl);
+                    }
+
+                    squareEl.addEventListener('click', () => handleSquareClick(squareSquare));
+                    boardEl.appendChild(squareEl);
+                }
+            }
+
+            updateHistoryUI();
+        }
+
+        function handleSquareClick(square) {
+            if (game.game_over()) return;
+            if (gameMode === 'vs-ai' && game.turn() !== 'w') return;
+            if (gameMode === 'online' && game.turn() !== myColor) return;
+
+            const piece = game.get(square);
+            if (piece && piece.color === game.turn()) {
+                selectedSquare = square;
+                legalMoves = game.moves({ square: square, verbose: true }).map(m => m.to);
+                renderBoard();
+                return;
+            }
+
+            if (selectedSquare && legalMoves.includes(square)) {
+                const moveObj = { from: selectedSquare, to: square, promotion: 'q' };
+                const move = game.move(moveObj);
+
+                if (move) {
+                    selectedSquare = null;
+                    legalMoves = [];
+                    renderBoard();
+                    updateStatus();
+
+                    if (gameMode === 'online' && conn) conn.send({ type: 'move', move: moveObj });
+
+                    if (gameMode === 'vs-ai' && !game.game_over() && game.turn() === 'b') {
+                        setTimeout(makeAIMove, 400);
+                    }
+                }
+            } else {
+                selectedSquare = null;
+                legalMoves = [];
+                renderBoard();
+            }
+        }
+
+        /* NƯỚC ĐI AI VÀ HOÀN NƯỚC KHI ĐẤU VỚI BOT */
+        function makeAIMove() {
+            if (game.game_over() || game.turn() !== 'b') return;
+            const moves = game.moves({ verbose: true });
+            if (moves.length === 0) return;
+
+            const move = moves[Math.floor(Math.random() * moves.length)];
+            game.move(move);
+            renderBoard();
+            updateStatus();
+        }
+
+        function handleUndo() {
+            if (game.history().length === 0) return;
+
+            if (gameMode === 'vs-ai') {
+                // Đổi lượt: Lùi lại 2 nước (của Bot + của Người)
+                if (game.turn() === 'w') {
+                    game.undo(); // Lùi nước của Bot
+                    game.undo(); // Lùi nước của Người
+                } else {
+                    game.undo(); 
+                }
+                
+                selectedSquare = null;
+                legalMoves = [];
+                renderBoard();
+                updateStatus();
+
+                // BOT ĐI TIẾP NẾU ĐẾN LƯỢT BOT
+                if (game.turn() === 'b' && !game.game_over()) {
+                    setTimeout(makeAIMove, 400);
+                }
+            } else if (gameMode === 'online') {
+                game.undo();
+                if (conn) conn.send({ type: 'undo' });
+                renderBoard();
+                updateStatus();
+            }
+        }
+
+        function updateStatus() {
+            let status = '';
+            const moveColor = game.turn() === 'w' ? 'Trắng' : 'Đen';
+            if (game.in_checkmate()) status = `CHIẾU HẾT! ${game.turn() === 'w' ? 'Đen' : 'Trắng'} THẮNG!`;
+            else if (game.in_draw()) status = 'HÒA CỜ!';
+            else status = `Đến lượt: ${moveColor}${game.in_check() ? ' (ĐANG BỊ CHIẾU!)' : ''}`;
+            document.getElementById('status-text').innerText = status;
+        }
+
+        function updateHistoryUI() {
+            const history = game.history();
+            const el = document.getElementById('move-history');
+            el.innerHTML = '';
+            for (let i = 0; i < history.length; i += 2) {
+                el.innerHTML += `<div class="history-row-num">${Math.floor(i / 2) + 1}.</div>
+                                 <div class="history-move">${history[i]}</div>
+                                 <div class="history-move">${history[i + 1] || ''}</div>`;
+            }
+            el.scrollTop = el.scrollHeight;
+        }
+    </script>
+</body>
+</html>
