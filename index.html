@@ -66,12 +66,10 @@
             width: 100%; 
             aspect-ratio: 1 / 1; 
             position: relative;
-            touch-action: none !important;
         }
         #myBoard { 
             width: 100% !important; 
             height: 100% !important; 
-            touch-action: none !important;
         }
 
         /* GỢI Ý Ô CÓ THỂ ĐI (CHẤM TRÒN) */
@@ -79,17 +77,18 @@
             position: absolute;
             width: 32%;
             height: 32%;
-            background: rgba(46, 196, 182, 0.8);
+            background: rgba(46, 196, 182, 0.9);
             border-radius: 50%;
             top: 34%;
             left: 34%;
-            z-index: 50;
+            z-index: 100;
             pointer-events: none;
-            box-shadow: 0 0 10px rgba(46, 196, 182, 0.9);
+            box-shadow: 0 0 12px rgba(46, 196, 182, 1);
         }
 
         .highlight-selected {
             box-shadow: inset 0 0 0 4px var(--accent-gold) !important;
+            background-color: rgba(255, 193, 7, 0.2) !important;
         }
 
         .panel { 
@@ -215,7 +214,6 @@
             $('#login-modal').fadeOut();
             setTimeout(() => { 
                 board.resize(); 
-                setupSquareClick(); 
             }, 150);
             initPeer();
         }
@@ -289,12 +287,10 @@
 
         function handleIncomingData(data) {
             if (data.type === 'move') {
-                board.position(game.fen());
                 animateMove(data.move.from, data.move.to, () => {
                     game.move(data.move);
                     board.position(game.fen());
                     updateStatus();
-                    setupSquareClick();
                 });
             } else if (data.type === 'chat') {
                 addChat(data.sender, data.text, 'peer');
@@ -312,60 +308,54 @@
             }
         }
 
-        // CƠ CHẾ ĐIỀU KHIỂN BẰNG CLICK HOÀN TOÀN
-        function setupSquareClick() {
-            $('#myBoard .square-55d63').off('click').on('click', function() {
-                if (game.game_over()) return;
-                
-                let square = $(this).attr('data-square');
-                
-                if (gameMode === 'online') {
-                    if (!conn) return;
-                    if ((game.turn() === 'w' && myColor !== 'w') || (game.turn() === 'b' && myColor !== 'b')) return;
-                }
+        // HỆ THỐNG CLICK CHỌN Ô & DI CHUYỂN
+        function onSquareClick(square) {
+            if (game.game_over()) return;
+            
+            if (gameMode === 'online') {
+                if (!conn) return;
+                if ((game.turn() === 'w' && myColor !== 'w') || (game.turn() === 'b' && myColor !== 'b')) return;
+            }
 
-                // Nếu đã chọn quân cờ trước đó và bấm vào ô đích hợp lệ
-                if (selectedSquare) {
-                    let matchMove = possibleMoves.find(m => m.to === square);
-                    if (matchMove) {
-                        let from = selectedSquare;
-                        clearHighlights();
-                        selectedSquare = null;
-
-                        board.position(game.fen());
-                        animateMove(from, square, () => {
-                            game.move({ from: from, to: square, promotion: 'q' });
-                            board.position(game.fen());
-                            updateStatus();
-                            setupSquareClick();
-
-                            if (conn && conn.open) {
-                                conn.send({ type: 'move', move: { from: from, to: square, promotion: 'q' } });
-                            } else if (gameMode === 'ai' && !game.game_over()) {
-                                setTimeout(makeAIMove, 300);
-                            }
-                        });
-                        return;
-                    }
-                }
-
-                // Chọn quân cờ của mình
-                clearHighlights();
-                let piece = game.get(square);
-                if (piece && piece.color === game.turn()) {
-                    if (gameMode === 'online' && piece.color !== myColor) return;
-                    
-                    selectedSquare = square;
-                    $(`#myBoard .square-${square}`).addClass('highlight-selected');
-                    
-                    possibleMoves = game.moves({ square: square, verbose: true });
-                    possibleMoves.forEach(m => {
-                        $(`#myBoard .square-${m.to}`).append('<div class="highlight-hint"></div>');
-                    });
-                } else {
+            // Nếu đã chọn quân cờ từ trước và bấm vào một ô đích hợp lệ
+            if (selectedSquare) {
+                let matchMove = possibleMoves.find(m => m.to === square);
+                if (matchMove) {
+                    let from = selectedSquare;
+                    clearHighlights();
                     selectedSquare = null;
+
+                    animateMove(from, square, () => {
+                        game.move({ from: from, to: square, promotion: 'q' });
+                        board.position(game.fen());
+                        updateStatus();
+
+                        if (conn && conn.open) {
+                            conn.send({ type: 'move', move: { from: from, to: square, promotion: 'q' } });
+                        } else if (gameMode === 'ai' && !game.game_over()) {
+                            setTimeout(makeAIMove, 300);
+                        }
+                    });
+                    return;
                 }
-            });
+            }
+
+            // Chọn quân cờ mới của mình
+            clearHighlights();
+            let piece = game.get(square);
+            if (piece && piece.color === game.turn()) {
+                if (gameMode === 'online' && piece.color !== myColor) return;
+                
+                selectedSquare = square;
+                $(`#myBoard .square-${square}`).addClass('highlight-selected');
+                
+                possibleMoves = game.moves({ square: square, verbose: true });
+                possibleMoves.forEach(m => {
+                    $(`#myBoard .square-${m.to}`).append('<div class="highlight-hint"></div>');
+                });
+            } else {
+                selectedSquare = null;
+            }
         }
 
         function clearHighlights() {
@@ -373,7 +363,7 @@
             $('#myBoard .highlight-hint').remove();
         }
 
-        // HIỆU ỨNG ANIMATION DI CHUYỂN
+        // ANIMATION DI CHUYỂN MƯỢT MÀ
         function animateMove(source, target, callback) {
             let pieceObj = game.get(source);
             let $sourceSquare = $(`#myBoard .square-${source}`);
@@ -427,12 +417,10 @@
             
             const randomMove = possibleMovesList[Math.floor(Math.random() * possibleMovesList.length)];
             
-            board.position(game.fen());
             animateMove(randomMove.from, randomMove.to, () => {
                 game.move(randomMove);
                 board.position(game.fen());
                 updateStatus();
-                setupSquareClick();
             });
         }
 
@@ -445,7 +433,6 @@
             board.position(game.fen());
             clearHighlights();
             updateStatus();
-            setupSquareClick();
         }
 
         function sendChat() {
@@ -492,7 +479,7 @@
 
         function resetGame() {
             game.reset();
-            board.start();
+            board.position('start');
             clearHighlights();
             selectedSquare = null;
             isGameOverShown = false;
@@ -502,7 +489,6 @@
                 board.orientation('white');
             }
             updateStatus();
-            setupSquareClick();
         }
 
         function showGameOver(title, desc, icon, color) {
@@ -569,17 +555,17 @@
             resetGame();
         }
 
-        // Khởi tạo bàn cờ TẮT HOÀN TOÀN kéo thả (draggable: false)
+        // KHỞI TẠO BÀN CỜ VÀ GẮN SỰ KIỆN CLICK TRỰC TIẾP QUA CHESSBOARD.JS
         board = Chessboard('myBoard', {
             draggable: false,
             position: 'start',
-            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+            onSquareClick: function(square) {
+                onSquareClick(square);
+            }
         });
 
         $(window).resize(() => board.resize());
-        
-        // Kích hoạt tính năng bấm chọn ô ngay khi tải trang
-        setTimeout(() => { setupSquareClick(); }, 300);
     </script>
 </body>
 </html>
