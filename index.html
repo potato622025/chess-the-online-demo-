@@ -35,8 +35,7 @@
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            overflow: hidden; 
-            touch-action: none; 
+            overflow-y: auto; /* Cho phép cuộn toàn trang */
         }
 
         .modal-overlay {
@@ -44,7 +43,6 @@
             background: rgba(11, 19, 41, 0.95);
             display: flex; justify-content: center; align-items: center;
             z-index: 9999; padding: 20px;
-            touch-action: auto;
         }
         .modal-box {
             background: var(--bg-card); padding: 25px; border-radius: 12px;
@@ -57,15 +55,28 @@
         h1 { color: var(--accent-gold); font-size: 1.3rem; }
         .user-badge { background: rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 20px; display: inline-block; margin-top: 4px; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.1); }
 
-        .main-container { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 400px; align-items: center; }
+        .main-container { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 400px; align-items: center; padding-bottom: 20px; }
 
-        .board-box { width: 100%; aspect-ratio: 1 / 1; }
-        #myBoard { width: 100% !important; height: 100% !important; touch-action: none !important; }
+        .board-box { width: 100%; aspect-ratio: 1 / 1; flex-shrink: 0; }
+        #myBoard { width: 100% !important; height: 100% !important; }
 
-        .panel { width: 100%; background: var(--bg-card); padding: 10px; border-radius: 10px; display: flex; flex-direction: column; gap: 6px; }
-        .status-box { background: #0b1329; padding: 6px; border-radius: 6px; text-align: center; font-weight: 600; color: var(--accent-blue); font-size: 0.85rem; }
+        /* BẢNG ĐIỀU KHIỂN CÓ THANH CUỘN ĐỂ THẤY NÚT THUA, VÁN MỚI, CẦU HÒA */
+        .panel { 
+            width: 100%; 
+            background: var(--bg-card); 
+            padding: 12px; 
+            border-radius: 10px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+            max-height: 300px; 
+            overflow-y: auto; /* Cho phép cuộn bên trong panel */
+            border: 1px solid #3a506b;
+        }
+        
+        .status-box { background: #0b1329; padding: 6px; border-radius: 6px; text-align: center; font-weight: 600; color: var(--accent-blue); font-size: 0.85rem; flex-shrink: 0; }
 
-        .input-group { display: flex; gap: 6px; width: 100%; }
+        .input-group { display: flex; gap: 6px; width: 100%; flex-shrink: 0; }
         input, select, button {
             padding: 8px; border-radius: 6px; border: 1px solid #3a506b;
             background: #0b1329; color: white; font-size: 0.8rem; outline: none;
@@ -75,14 +86,14 @@
         
         .chat-box {
             background: #0b1329; border-radius: 6px; padding: 6px;
-            height: 90px; display: flex; flex-direction: column; gap: 3px;
+            height: 90px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0;
         }
         .chat-messages { flex: 1; overflow-y: auto; font-size: 0.75rem; display: flex; flex-direction: column; gap: 2px; }
         .msg { padding: 2px 5px; border-radius: 4px; background: rgba(255,255,255,0.08); max-width: 90%; word-break: break-word; }
         .msg.me { background: #1d3557; align-self: flex-end; color: #a8dadc; }
         .msg.peer { background: #3a506b; align-self: flex-start; }
 
-        .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+        .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; flex-shrink: 0; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -134,7 +145,7 @@
 
             <div class="btn-grid">
                 <button style="background: var(--accent-red);" onclick="resignGame()">Đầu hàng</button>
-                <button style="background: var(--accent-gold); color: black;" onclick="offerDraw()">Cầu hòa</button>
+                <button style="background: var(--accent-gold; color: black;" onclick="offerDraw()">Cầu hòa</button>
                 <button style="background: #f77f00;" onclick="requestReset()">Ván mới</button>
             </div>
         </div>
@@ -159,33 +170,41 @@
 
         function initPeer() {
             const randomID = Math.floor(1000 + Math.random() * 9000).toString();
-            peer = new Peer('chess-' + randomID, { config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
-            peer.on('open', id => $('#my-id').text(id.replace('chess-', '')));
+            peer = new Peer('chess-' + randomID, {
+                config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] }
+            });
+
+            peer.on('open', id => {
+                $('#my-id').text(id.replace('chess-', ''));
+            });
+
+            peer.on('error', err => { console.error(err); });
             
             peer.on('connection', connection => {
-                conn = connection;
-                setupConnection();
-                
-                conn.on('data', data => {
-                    if (data.type === 'challenge_request') {
-                        if (confirm(`[${data.fromName}] muốn đấu online với bạn. Đồng ý?`)) {
-                            // Ép buộc đổi selectbox sang online ngay lập tức
-                            $('#game-mode').val('online');
-                            gameMode = 'online';
-                            $('#online-controls, #chat-container').show();
-                            
-                            myColor = 'b';
-                            board.orientation('black');
-                            conn.send({ type: 'challenge_response', accepted: true, name: myUsername });
-                            resetGame();
-                            addChat('Hệ thống', `Đã kết nối với [${data.fromName}]! Bạn cầm quân Đen.`);
-                        } else {
-                            conn.send({ type: 'challenge_response', accepted: false });
-                        }
+                bindConnection(connection);
+            });
+        }
+
+        function bindConnection(connection) {
+            conn = connection;
+            conn.on('data', data => {
+                if (data.type === 'challenge_request') {
+                    if (confirm(`[${data.fromName}] muốn đấu online với bạn. Đồng ý?`)) {
+                        $('#game-mode').val('online');
+                        gameMode = 'online';
+                        $('#online-controls, #chat-container').show();
+                        
+                        myColor = 'b';
+                        board.orientation('black');
+                        conn.send({ type: 'challenge_response', accepted: true, name: myUsername });
+                        resetGame();
+                        addChat('Hệ thống', `Đã kết nối với [${data.fromName}]! Bạn cầm quân Đen.`);
                     } else {
-                        handleIncomingData(data);
+                        conn.send({ type: 'challenge_response', accepted: false });
                     }
-                });
+                } else {
+                    handleIncomingData(data);
+                }
             });
         }
 
@@ -194,14 +213,14 @@
             if (!targetID) return alert('Nhập ID đối thủ!');
             
             gameMode = 'online';
-            conn = peer.connect('chess-' + targetID);
+            const tempConn = peer.connect('chess-' + targetID);
             
-            conn.on('open', () => {
+            tempConn.on('open', () => {
+                bindConnection(tempConn);
                 conn.send({ type: 'challenge_request', fromName: myUsername });
-                setupConnection();
             });
 
-            conn.on('data', data => {
+            tempConn.on('data', data => {
                 if (data.type === 'challenge_response') {
                     if (data.accepted) {
                         myColor = 'w';
@@ -215,11 +234,6 @@
                     handleIncomingData(data);
                 }
             });
-        }
-
-        function setupConnection() {
-            if (!conn) return;
-            conn.on('data', data => handleIncomingData(data));
         }
 
         function handleIncomingData(data) {
@@ -249,25 +263,22 @@
 
         function onDragStart(source, piece) {
             if (game.game_over()) return false;
-            
-            // Nếu đang kết nối online, khóa màu cờ theo phân công (Trắng/Đen)
             if (gameMode === 'online') {
                 if (!conn) return false;
                 if ((game.turn() === 'w' && myColor !== 'w') || (game.turn() === 'b' && myColor !== 'b')) return false;
             }
-            
             if ((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
                 return false;
             }
         }
 
         function onDrop(source, target) {
+            // Kiểm tra nước đi có hợp lệ theo luật chess.js không
             let move = game.move({ from: source, to: target, promotion: 'q' });
-            if (move === null) return 'snapback';
+            if (move === null) return 'snapback'; // Trả về vị trí cũ nếu sai luật (ví dụ đang bị chiếu mà đi quân khác không cứu vua)
 
             updateStatus();
 
-            // KIỂM TRA NGHIÊM NGẶT: Nếu có kết nối mạng, LUÔN LUÔN gửi nước đi qua peer, TUYỆT ĐỐI KHÔNG gọi AI
             if (conn && conn.open) {
                 conn.send({ type: 'move', move: { from: source, to: target, promotion: 'q' } });
             } else if (gameMode === 'ai' && !game.game_over()) {
@@ -278,7 +289,6 @@
         function onSnapEnd() { board.position(game.fen()); }
 
         function makeAIMove() {
-            // Chặn tuyệt đối nếu không ở chế độ AI hoặc đang có kết nối mạng
             if (gameMode !== 'ai' || (conn && conn.open)) return;
             const moves = game.moves();
             if (moves.length === 0) return;
@@ -290,9 +300,7 @@
         function sendChat() {
             const txt = $('#chat-input').val().trim();
             if (!txt) return;
-            
             addChat(myUsername, txt, 'me');
-
             if (conn && conn.open) {
                 conn.send({ type: 'chat', text: txt, sender: myUsername });
             }
