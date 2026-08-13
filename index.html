@@ -79,11 +79,45 @@
             width: 100%; 
             aspect-ratio: 1 / 1; 
             touch-action: none !important; 
+            position: relative;
         }
         #myBoard { 
             width: 100% !important; 
             height: 100% !important; 
             touch-action: none !important; 
+        }
+
+        /* HIỆU ỨNG ANIMATION RIÊNG CHO TỪNG LOẠI QUÂN CỜ */
+        @keyframes knightJump {
+            0% { transform: scale(1) translate(0, 0); }
+            50% { transform: scale(1.25) translate(calc(var(--dx) * 0.5), -35px); filter: drop-shadow(0 15px 10px rgba(0,0,0,0.6)); }
+            100% { transform: scale(1) translate(0, 0); }
+        }
+
+        @keyframes pieceSlide {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(0, 0); }
+        }
+
+        @keyframes pieceCapture {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.5; filter: brightness(1.5) drop-shadow(0 0 10px var(--accent-red)); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        .anim-knight {
+            animation: knightJump 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            z-index: 100;
+        }
+
+        .anim-slide {
+            animation: pieceSlide 0.3s ease-in-out forwards;
+            z-index: 100;
+        }
+
+        .anim-capture {
+            animation: pieceCapture 0.35s ease-out forwards;
+            z-index: 90;
         }
 
         .panel { 
@@ -176,7 +210,6 @@
                 </div>
             </div>
 
-            <!-- CÁC NÚT ĐIỀU KHIỂN TRẬN ĐẤU -->
             <div class="btn-grid" id="ai-buttons">
                 <button style="background: var(--accent-blue);" onclick="undoMove()"><i class="fa-solid fa-rotate-left"></i> Đi lại (Undo)</button>
                 <button style="background: #f77f00;" onclick="requestReset()"><i class="fa-solid fa-rotate"></i> Ván mới</button>
@@ -278,9 +311,11 @@
 
         function handleIncomingData(data) {
             if (data.type === 'move') {
-                game.move(data.move);
-                board.position(game.fen());
-                updateStatus();
+                animateAndExecuteMove(data.move.from, data.move.to, () => {
+                    game.move(data.move);
+                    board.position(game.fen());
+                    updateStatus();
+                });
             } else if (data.type === 'chat') {
                 addChat(data.sender, data.text, 'peer');
             } else if (data.type === 'resign') {
@@ -309,35 +344,94 @@
         }
 
         function onDrop(source, target) {
-            let move = game.move({ from: source, to: target, promotion: 'q' });
-            if (move === null) return 'snapback';
+            let pieceObj = game.get(source);
+            let targetObj = game.get(target);
+            let moveCheck = game.move({ from: source, to: target, promotion: 'q' });
+            
+            if (moveCheck === null) return 'snapback';
+            game.undo(); // Hoàn lại tạm thời để thực hiện hiệu ứng animation trực quan
 
-            updateStatus();
+            animateAndExecuteMove(source, target, () => {
+                let move = game.move({ from: source, to: target, promotion: 'q' });
+                board.position(game.fen());
+                updateStatus();
 
-            if (conn && conn.open) {
-                conn.send({ type: 'move', move: { from: source, to: target, promotion: 'q' } });
-            } else if (gameMode === 'ai' && !game.game_over()) {
-                setTimeout(makeAIMove, 300);
-            }
+                if (conn && conn.open) {
+                    conn.send({ type: 'move', move: { from: source, to: target, promotion: 'q' } });
+                } else if (gameMode === 'ai' && !game.game_over()) {
+                    setTimeout(makeAIMove, 300);
+                }
+            });
         }
 
         function onSnapEnd() { board.position(game.fen()); }
 
-        function makeAIMove() {
-            if (gameMode !== 'ai' || (conn && conn.open)) return;
-            const moves = game.moves();
-            if (moves.length === 0) return;
-            game.move(moves[Math.floor(Math.random() * moves.length)]);
-            board.position(game.fen());
-            updateStatus();
+        // HÀM XỬ LÝ ANIMATION RIÊNG CHO TỪNG QUÂN CỜ
+        function animateAndExecuteMove(source, target, callback) {
+            let pieceObj = game.get(source);
+            if (!pieceObj) {
+                callback();
+                return;
+            }
+
+            let $sourceSquare = $(`#myBoard .square-${source}`);
+            let $targetSquare = $(`#myBoard .square-${target}`);
+            let $pieceImg = $sourceSquare.find('img');
+
+            if ($pieceImg.length === 0) {
+                callback();
+                return;
+            }
+
+            // Tính toán khoảng cách dịch chuyển cho quân Mã
+            let fileFrom = source.charCodeAt(0);
+            let rankFrom = parseInt(source[1]);
+            let fileTo = target.charCodeAt(0);
+            let rankTo = parseInt(target[1]);
+            let dx = (fileTo - fileFrom) * $sourceSquare.width();
+            let dy = (rankFrom - rankTo) * $sourceSquare.height();
+
+            $pieceImg.css('--dx', dx + 'px');
+
+            // Kiểm tra loại quân để gán hiệu ứng tương ứng
+            if (pieceObj.type === 'n') {
+                // Quân Mã: Nhảy hình chữ L
+                $pieceImg.addClass('anim-knight');
+            } else {
+                // Các quân khác: Trượt mượt mà
+                $pieceImg.addClass('anim-slide');
+            }
+
+            // Nếu ô đích có quân bị ăn, thêm hiệu ứng biến mất cho quân bị ăn
+            let $targetPieceImg = $targetSquare.find('img');
+            if ($targetPieceImg.length > 0 && game.get(target)) {
+                $targetPieceImg.addClass('anim-capture');
+            }
+
+            setTimeout(() => {
+                $pieceImg.removeClass('anim-knight anim-slide');
+                callback();
+            }, 350);
         }
 
-        // HÀM HOÀN BƯỚC ĐI (UNDO) KHI ĐẤU VỚI MÁY
+        function makeAIMove() {
+            if (gameMode !== 'ai' || (conn && conn.open)) return;
+            const possibleMoves = game.moves({ verbose: true });
+            if (possibleMoves.length === 0) return;
+            
+            const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+            
+            animateAndExecuteMove(randomMove.from, randomMove.to, () => {
+                game.move(randomMove);
+                board.position(game.fen());
+                updateStatus();
+            });
+        }
+
         function undoMove() {
             if (gameMode !== 'ai') return alert('Chỉ dùng tính năng đi lại khi đấu với Máy!');
             if (game.game_over()) isGameOverShown = false;
             
-            // Hoàn lại 2 bước (1 bước của bạn và 1 bước của máy)
             game.undo();
             game.undo();
             board.position(game.fen());
