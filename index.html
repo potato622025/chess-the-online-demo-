@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cờ Vua Trực Tuyến Pro</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,53 +30,97 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background: var(--bg-main); color: var(--text-light); min-height: 100vh; padding: 10px; display: flex; flex-direction: column; align-items: center; }
 
+        /* Modal Đăng Nhập */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 19, 41, 0.95);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 9999; padding: 20px;
+        }
+        .modal-box {
+            background: var(--bg-card); padding: 25px; border-radius: 12px;
+            width: 100%; max-width: 360px; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #3a506b;
+        }
+        .modal-box h2 { color: var(--accent-gold); margin-bottom: 15px; font-size: 1.4rem; }
+
         header { text-align: center; margin-bottom: 12px; width: 100%; }
-        h1 { color: var(--accent-gold); font-size: 1.6rem; }
+        h1 { color: var(--accent-gold); font-size: 1.5rem; }
         .user-badge { background: rgba(255, 255, 255, 0.08); padding: 6px 14px; border-radius: 20px; display: inline-block; margin-top: 6px; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.1); }
 
-        .main-container { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 950px; align-items: center; }
+        .main-container { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 950px; align-items: center; }
 
-        /* Bàn cờ vuông vắn */
-        .board-box { width: 100%; max-width: 440px; }
-        
+        /* Khung chứa bàn cờ vuông vắn 100% */
+        .board-box {
+            width: 100%;
+            max-width: 440px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+        }
+        #myBoard {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
         .panel { width: 100%; max-width: 440px; background: var(--bg-card); padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
         .status-box { background: #0b1329; padding: 8px; border-radius: 6px; text-align: center; font-weight: 600; color: var(--accent-blue); font-size: 0.95rem; }
 
-        .input-group { display: flex; gap: 8px; }
-        input, select, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #3a506b; background: #0b1329; color: white; font-size: 0.85rem; outline: none; }
-        input { flex: 1; }
-        button { background: var(--accent-green); color: white; font-weight: 600; cursor: pointer; border: none; }
-        button:hover { opacity: 0.9; }
+        .input-group { display: flex; gap: 8px; width: 100%; }
+        input, select, button {
+            padding: 10px 12px; border-radius: 6px; border: 1px solid #3a506b;
+            background: #0b1329; color: white; font-size: 0.9rem; outline: none;
+            -webkit-appearance: none;
+        }
+        input { flex: 1; min-width: 0; }
+        button { background: var(--accent-green); color: white; font-weight: 600; cursor: pointer; border: none; white-space: nowrap; }
+        button:active { opacity: 0.8; }
 
-        /* Khung Chat */
-        .chat-box { background: #0b1329; border-radius: 8px; padding: 8px; height: 120px; display: flex; flex-direction: column; }
-        .chat-messages { flex: 1; overflow-y: auto; font-size: 0.8rem; display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
-        .msg { padding: 3px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); max-width: 85%; }
-        .msg.me { background: #1d3557; align-self: flex-end; }
+        /* Khung Chat tối ưu cho Mobile */
+        .chat-box {
+            background: #0b1329; border-radius: 8px; padding: 8px;
+            height: 140px; display: flex; flex-direction: column; gap: 6px;
+        }
+        .chat-messages {
+            flex: 1; overflow-y: auto; font-size: 0.85rem;
+            display: flex; flex-direction: column; gap: 4px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .msg { padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.08); max-width: 90%; word-break: break-word; }
+        .msg.me { background: #1d3557; align-self: flex-end; color: #a8dadc; }
         .msg.peer { background: #3a506b; align-self: flex-start; }
 
         @media (min-width: 768px) {
             .main-container { flex-direction: row; align-items: flex-start; justify-content: center; }
-            .chat-box { height: 160px; }
+            .chat-box { height: 180px; }
         }
     </style>
 </head>
 <body>
 
+    <!-- Popup Đăng Nhập -->
+    <div class="modal-overlay" id="login-modal">
+        <div class="modal-box">
+            <h2><i class="fa-solid fa-user-gear"></i> ĐĂNG NHẬP GAME</h2>
+            <p style="font-size: 0.85rem; color: #8d99ae; margin-bottom: 15px;">Nhập tên của bạn để tạo ID thi đấu</p>
+            <input type="text" id="username-input" placeholder="Nhập tên người chơi..." style="width: 100%; margin-bottom: 15px;" onkeypress="if(event.key==='Enter') login()">
+            <button style="width: 100%; padding: 12px; font-size: 1rem;" onclick="login()">VÀO BÀN CỜ</button>
+        </div>
+    </div>
+
     <header>
         <h1><i class="fa-solid fa-chess"></i> CỜ VUA TRỰC TUYẾN</h1>
         <div class="user-badge">
-            <span id="my-name">Khởi tạo...</span> | <b>ID: <span id="my-id" style="color: var(--accent-gold);">....</span></b>
+            <span id="my-name">Chưa đăng nhập</span> | <b>ID: <span id="my-id" style="color: var(--accent-gold);">....</span></b>
         </div>
     </header>
 
     <div class="main-container">
         <!-- Bàn cờ -->
         <div class="board-box">
-            <div id="myBoard" style="width: 100%;"></div>
+            <div id="myBoard"></div>
         </div>
 
-        <!-- Điều khiển & Chat -->
+        <!-- Panel điều khiển -->
         <div class="panel">
             <div class="status-box" id="status">Lượt đi: Trắng</div>
 
@@ -89,22 +133,22 @@
             </div>
 
             <div class="input-group" id="online-controls">
-                <input type="text" id="peer-id-input" placeholder="Nhập ID đối thủ..." maxlength="4">
+                <input type="text" id="peer-id-input" placeholder="Nhập ID đối thủ..." maxlength="4" inputmode="numeric">
                 <button onclick="requestChallenge()"><i class="fa-solid fa-paper-plane"></i> Thách Đấu</button>
             </div>
 
-            <!-- Khung Chat -->
+            <!-- Chat -->
             <div class="chat-box" id="chat-container">
                 <div class="chat-messages" id="chat-messages">
-                    <div class="msg" style="color: #8d99ae; text-align:center;">Hệ thống: Nhập ID để bắt đầu chat & đấu</div>
+                    <div class="msg" style="color: #8d99ae; text-align:center;">Hệ thống: Nhập ID đối thủ để kết nối</div>
                 </div>
                 <div class="input-group">
-                    <input type="text" id="chat-input" placeholder="Nhắn tin..." onkeypress="if(event.key==='Enter') sendChat()">
-                    <button onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button>
+                    <input type="text" id="chat-input" placeholder="Nhắn tin..." inputmode="text" autocomplete="off">
+                    <button id="btn-send-chat" onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button>
                 </div>
             </div>
 
-            <!-- Nút Đầu hàng & Ván mới -->
+            <!-- Nút bấm -->
             <div style="display: flex; gap: 8px;">
                 <button style="flex:1; background: var(--accent-red);" onclick="resignGame()"><i class="fa-solid fa-flag"></i> Nhận Thua</button>
                 <button style="flex:1; background: #f77f00;" onclick="requestReset()"><i class="fa-solid fa-rotate-right"></i> Ván Mới</button>
@@ -117,8 +161,33 @@
         let game = new Chess();
         let peer = null, conn = null;
         let myColor = 'w', gameMode = 'online';
+        let myUsername = "Player";
 
-        // 1. Khởi tạo PeerJS với ID ngẫu nhiên
+        // Bắt sự kiện phím Enter trên điện thoại cho ô Chat
+        $(document).ready(function() {
+            $('#chat-input').on('keypress', function(e) {
+                if (e.which === 13) {
+                    sendChat();
+                }
+            });
+        });
+
+        // Xử lý đăng nhập tên
+        function login() {
+            const name = $('#username-input').val().trim();
+            if (!name) return alert('Vui lòng nhập tên người chơi!');
+            myUsername = name;
+            $('#my-name').text(myUsername);
+            $('#login-modal').hide();
+            
+            // Render bàn cờ đúng kích thước sau khi tắt modal
+            setTimeout(() => {
+                board.resize();
+            }, 100);
+
+            initPeer();
+        }
+
         function initPeer() {
             const randomID = Math.floor(1000 + Math.random() * 9000).toString();
             peer = new Peer('chess-' + randomID);
@@ -126,21 +195,19 @@
             peer.on('open', id => {
                 const cleanID = id.replace('chess-', '');
                 $('#my-id').text(cleanID);
-                $('#my-name').text('Player_' + cleanID);
             });
 
             peer.on('connection', connection => {
-                // Nhận lời mời thách đấu
                 connection.on('data', data => {
                     if (data.type === 'challenge_request') {
-                        const accept = confirm(`Đối thủ ID ${data.from} muốn thách đấu với bạn. Bạn có đồng ý không?`);
+                        const accept = confirm(`[${data.fromName}] (ID: ${data.fromID}) muốn thách đấu với bạn. Đồng ý?`);
                         if (accept) {
                             conn = connection;
-                            myColor = 'b'; // Người đồng ý cầm Đen
+                            myColor = 'b';
                             board.orientation('black');
                             setupConnection();
-                            conn.send({ type: 'challenge_response', accepted: true });
-                            addChat('Hệ thống', 'Đã chấp nhận thách đấu! Bạn cầm quân ĐEN.');
+                            conn.send({ type: 'challenge_response', accepted: true, name: myUsername });
+                            addChat('Hệ thống', `Đã kết nối với [${data.fromName}]! Bạn cầm quân ĐEN.`);
                             resetGame();
                         } else {
                             connection.send({ type: 'challenge_response', accepted: false });
@@ -152,7 +219,6 @@
             });
         }
 
-        // 2. Gửi lời mời thách đấu
         function requestChallenge() {
             const targetID = $('#peer-id-input').val().trim();
             if (!targetID) return alert('Vui lòng nhập ID đối thủ!');
@@ -161,20 +227,24 @@
             const tempConn = peer.connect('chess-' + targetID);
 
             tempConn.on('open', () => {
-                tempConn.send({ type: 'challenge_request', from: $('#my-id').text() });
+                tempConn.send({ 
+                    type: 'challenge_request', 
+                    fromName: myUsername, 
+                    fromID: $('#my-id').text() 
+                });
             });
 
             tempConn.on('data', data => {
                 if (data.type === 'challenge_response') {
                     if (data.accepted) {
                         conn = tempConn;
-                        myColor = 'w'; // Người gửi thách đấu cầm Trắng
+                        myColor = 'w';
                         board.orientation('white');
                         setupConnection();
-                        addChat('Hệ thống', 'Đối thủ đã ĐỒNG Ý! Bạn cầm quân TRẮNG.');
+                        addChat('Hệ thống', `[${data.name}] đã đồng ý! Bạn cầm quân TRẮNG.`);
                         resetGame();
                     } else {
-                        alert('Đối thủ đã TỪ CHỐI lời mời thách đấu!');
+                        alert('Đối thủ đã TỪ CHỐI lời mời!');
                         addChat('Hệ thống', 'Lời mời bị từ chối.');
                     }
                 } else {
@@ -183,7 +253,6 @@
             });
         }
 
-        // 3. Xử lý dữ liệu truyền qua lại
         function setupConnection() {
             conn.on('data', data => handleIncomingData(data));
         }
@@ -194,27 +263,22 @@
                 board.position(game.fen());
                 updateStatus();
             } else if (data.type === 'chat') {
-                addChat('Đối thủ', data.text, 'peer');
+                addChat(data.sender, data.text, 'peer');
             } else if (data.type === 'resign') {
                 alert('Đối thủ đã ĐẦU HÀNG! Bạn giành chiến thắng! 🎉');
                 addChat('Hệ thống', 'Đối thủ đã đầu hàng.');
             } else if (data.type === 'reset_request') {
-                if (confirm('Đối thủ muốn xin chơi VÁN MỚI. Bạn có đồng ý không?')) {
-                    game.reset();
-                    board.start();
-                    updateStatus();
+                if (confirm('Đối thủ xin chơi VÁN MỚI. Đồng ý?')) {
+                    game.reset(); board.start(); updateStatus();
                     conn.send({ type: 'reset_accept' });
-                    addChat('Hệ thống', 'Đã bắt đầu ván mới!');
+                    addChat('Hệ thống', 'Bắt đầu ván mới!');
                 }
             } else if (data.type === 'reset_accept') {
-                game.reset();
-                board.start();
-                updateStatus();
+                game.reset(); board.start(); updateStatus();
                 alert('Đối thủ đã đồng ý tạo ván mới!');
             }
         }
 
-        // 4. Xử lý di chuyển bàn cờ
         function onDragStart(source, piece) {
             if (game.game_over()) return false;
             if (gameMode === 'online') {
@@ -227,7 +291,6 @@
         function onDrop(source, target) {
             const move = game.move({ from: source, to: target, promotion: 'q' });
             if (move === null) return 'snapback';
-
             updateStatus();
             if (gameMode === 'online' && conn) {
                 conn.send({ type: 'move', move: { from: source, to: target, promotion: 'q' } });
@@ -238,12 +301,13 @@
 
         function onSnapEnd() { board.position(game.fen()); }
 
-        // Chat
         function sendChat() {
             const txt = $('#chat-input').val().trim();
             if (!txt) return;
             addChat('Bạn', txt, 'me');
-            if (gameMode === 'online' && conn) conn.send({ type: 'chat', text: txt });
+            if (gameMode === 'online' && conn) {
+                conn.send({ type: 'chat', text: txt, sender: myUsername });
+            }
             $('#chat-input').val('');
         }
 
@@ -253,7 +317,6 @@
             $('#chat-messages').scrollTop($('#chat-messages')[0].scrollHeight);
         }
 
-        // Đầu hàng & Ván mới
         function resignGame() {
             if (gameMode === 'online' && !conn) return;
             if (confirm('Bạn có chắc chắn muốn NHẬN THUA ván này?')) {
@@ -266,12 +329,16 @@
             if (gameMode === 'online') {
                 if (!conn) return alert('Chưa kết nối đối thủ!');
                 conn.send({ type: 'reset_request' });
-                addChat('Hệ thống', 'Đã gửi yêu cầu ván mới tới đối thủ...');
+                addChat('Hệ thống', 'Đã gửi yêu cầu ván mới...');
             } else {
-                game.reset();
-                board.start();
-                updateStatus();
+                game.reset(); board.start(); updateStatus();
             }
+        }
+
+        function resetGame() {
+            game.reset();
+            board.start();
+            updateStatus();
         }
 
         function updateStatus() {
@@ -295,24 +362,21 @@
             gameMode = $('#game-mode').val();
             if (gameMode === 'online') $('#online-controls, #chat-container').show();
             else $('#online-controls, #chat-container').hide();
-            game.reset();
-            board.start();
-            updateStatus();
+            game.reset(); board.start(); updateStatus();
         }
 
-        // Khởi tạo Bàn cờ SVG
         const config = {
-            draggable: true,
-            position: 'start',
-            onDragStart: onDragStart,
-            onDrop: onDrop,
-            onSnapEnd: onSnapEnd,
+            draggable: true, position: 'start',
+            onDragStart: onDragStart, onDrop: onDrop, onSnapEnd: onSnapEnd,
             pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
         };
         board = Chessboard('myBoard', config);
-        $(window).resize(board.resize);
 
-        initPeer();
+        // Resize bàn cờ vuông vắn theo kích thước màn hình
+        $(window).on('resize orientationchange', function() {
+            board.resize();
+        });
+
         updateStatus();
     </script>
 </body>
