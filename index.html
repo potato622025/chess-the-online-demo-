@@ -74,6 +74,24 @@
             touch-action: none !important; 
         }
 
+        /* HIỆU ỨNG GỢI Ý Ô CÓ THỂ ĐI (CHẤM TRÒN HOẶC VIỀN) */
+        .highlight-hint {
+            position: absolute;
+            width: 32%;
+            height: 32%;
+            background: rgba(46, 196, 182, 0.7);
+            border-radius: 50%;
+            top: 34%;
+            left: 34%;
+            z-index: 50;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(46, 196, 182, 0.9);
+        }
+
+        .highlight-selected {
+            box-shadow: inset 0 0 0 4px var(--accent-gold) !important;
+        }
+
         .panel { 
             width: 100%; 
             background: var(--bg-card); 
@@ -185,6 +203,9 @@
         let myUsername = "Player";
         let lastChatText = "";
         let isGameOverShown = false;
+        
+        let selectedSquare = null;
+        let possibleMoves = [];
 
         function login() {
             const name = $('#username-input').val().trim();
@@ -192,7 +213,7 @@
             myUsername = name;
             $('#my-name').text(myUsername);
             $('#login-modal').fadeOut();
-            setTimeout(() => { board.resize(); }, 150);
+            setTimeout(() => { board.resize(); setupSquareClick(); }, 150);
             initPeer();
         }
 
@@ -269,6 +290,7 @@
                     game.move(data.move);
                     board.position(game.fen());
                     updateStatus();
+                    setupSquareClick();
                 });
             } else if (data.type === 'chat') {
                 addChat(data.sender, data.text, 'peer');
@@ -286,38 +308,66 @@
             }
         }
 
-        function onDragStart(source, piece) {
-            if (game.game_over()) return false;
-            if (gameMode === 'online') {
-                if (!conn) return false;
-                if ((game.turn() === 'w' && myColor !== 'w') || (game.turn() === 'b' && myColor !== 'b')) return false;
-            }
-            if ((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
-                return false;
-            }
-        }
+        // THAY THẾ KÉO THẢ BẰNG CƠ CHẾ CLICK CHỌN Ô
+        function setupSquareClick() {
+            $('#myBoard .square-55d63').off('click').on('click', function() {
+                if (game.game_over()) return;
+                
+                let square = $(this).attr('data-square');
+                
+                if (gameMode === 'online') {
+                    if (!conn) return;
+                    if ((game.turn() === 'w' && myColor !== 'w') || (game.turn() === 'b' && myColor !== 'b')) return;
+                }
 
-        function onDrop(source, target) {
-            let moveCheck = game.move({ from: source, to: target, promotion: 'q' });
-            if (moveCheck === null) return 'snapback';
-            game.undo(); // Hoàn lại tạm thời để chạy hiệu ứng animation
+                // Nếu đã chọn một quân cờ trước đó và bấm vào ô đích hợp lệ
+                if (selectedSquare) {
+                    let matchMove = possibleMoves.find(m => m.to === square);
+                    if (matchMove) {
+                        let from = selectedSquare;
+                        clearHighlights();
+                        selectedSquare = null;
 
-            animateAndExecuteMove(source, target, () => {
-                game.move({ from: source, to: target, promotion: 'q' });
-                board.position(game.fen());
-                updateStatus();
+                        animateAndExecuteMove(from, square, () => {
+                            game.move({ from: from, to: square, promotion: 'q' });
+                            board.position(game.fen());
+                            updateStatus();
+                            setupSquareClick();
 
-                if (conn && conn.open) {
-                    conn.send({ type: 'move', move: { from: source, to: target, promotion: 'q' } });
-                } else if (gameMode === 'ai' && !game.game_over()) {
-                    setTimeout(makeAIMove, 300);
+                            if (conn && conn.open) {
+                                conn.send({ type: 'move', move: { from: from, to: square, promotion: 'q' } });
+                            } else if (gameMode === 'ai' && !game.game_over()) {
+                                setTimeout(makeAIMove, 300);
+                            }
+                        });
+                        return;
+                    }
+                }
+
+                // Chọn quân cờ của mình
+                clearHighlights();
+                let piece = game.get(square);
+                if (piece && piece.color === game.turn()) {
+                    if (gameMode === 'online' && piece.color !== myColor) return;
+                    
+                    selectedSquare = square;
+                    $(`#myBoard .square-${square}`).addClass('highlight-selected');
+                    
+                    possibleMoves = game.moves({ square: square, verbose: true });
+                    possibleMoves.forEach(m => {
+                        $(`#myBoard .square-${m.to}`).append('<div class="highlight-hint"></div>');
+                    });
+                } else {
+                    selectedSquare = null;
                 }
             });
         }
 
-        function onSnapEnd() { board.position(game.fen()); }
+        function clearHighlights() {
+            $('#myBoard .square-55d63').removeClass('highlight-selected');
+            $('#myBoard .highlight-hint').remove();
+        }
 
-        // HIỆU ỨNG ANIMATION RIÊNG BIỆT DÙNG JS ANIMATE
         function animateAndExecuteMove(source, target, callback) {
             let pieceObj = game.get(source);
             let $sourceSquare = $(`#myBoard .square-${source}`);
@@ -329,7 +379,6 @@
                 return;
             }
 
-            // Tạo quân cờ ảo bay trên bàn cờ để chạy animation
             let $clone = $pieceImg.clone().appendTo('#myBoard').css({
                 position: 'absolute',
                 zIndex: 1000,
@@ -339,19 +388,15 @@
                 height: $sourceSquare.height()
             });
 
-            // Ẩn quân gốc tạm thời
             $pieceImg.hide();
-
             let targetPos = $targetSquare.position();
 
-            // Xử lý hiệu ứng quân bị ăn (nếu có)
             let $targetPieceImg = $targetSquare.find('img');
             if ($targetPieceImg.length > 0 && game.get(target)) {
                 $targetPieceImg.fadeOut(250);
             }
 
             if (pieceObj.type === 'n') {
-                // QUÂN MÃ: Hiệu ứng nhảy vọt hình chữ L lên cao rồi đáp xuống
                 let midLeft = (targetPos.left + $sourceSquare.position().left) / 2;
                 let midTop = Math.min(targetPos.top, $sourceSquare.position().top) - 30;
 
@@ -362,7 +407,6 @@
                     });
                 });
             } else {
-                // CÁC QUÂN KHÁC: Hiệu ứng trượt lướt mượt mà
                 $clone.animate({ left: targetPos.left, top: targetPos.top }, 250, 'easeInOutQuad', function() {
                     $(this).remove();
                     callback();
@@ -372,15 +416,16 @@
 
         function makeAIMove() {
             if (gameMode !== 'ai' || (conn && conn.open)) return;
-            const possibleMoves = game.moves({ verbose: true });
-            if (possibleMoves.length === 0) return;
+            const possibleMovesList = game.moves({ verbose: true });
+            if (possibleMovesList.length === 0) return;
             
-            const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+            const randomMove = possibleMovesList[Math.floor(Math.random() * possibleMovesList.length)];
             
             animateAndExecuteMove(randomMove.from, randomMove.to, () => {
                 game.move(randomMove);
                 board.position(game.fen());
                 updateStatus();
+                setupSquareClick();
             });
         }
 
@@ -391,7 +436,9 @@
             game.undo();
             game.undo();
             board.position(game.fen());
+            clearHighlights();
             updateStatus();
+            setupSquareClick();
         }
 
         function sendChat() {
@@ -439,6 +486,7 @@
         function resetGame() {
             game.reset();
             board.start();
+            clearHighlights();
             isGameOverShown = false;
             if (gameMode === 'online') {
                 board.orientation(myColor === 'w' ? 'white' : 'black');
@@ -446,6 +494,7 @@
                 board.orientation('white');
             }
             updateStatus();
+            setupSquareClick();
         }
 
         function showGameOver(title, desc, icon, color) {
@@ -513,15 +562,15 @@
         }
 
         board = Chessboard('myBoard', {
-            draggable: true,
+            draggable: false, // Vô hiệu hóa kéo thả mặc định để dùng bấm chọn
             position: 'start',
-            onDragStart: onDragStart,
-            onDrop: onDrop,
-            onSnapEnd: onSnapEnd,
             pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
         });
 
         $(window).resize(() => board.resize());
+        
+        // Khởi tạo sự kiện click ngay khi tải xong
+        setTimeout(() => { setupSquareClick(); }, 300);
     </script>
 </body>
 </html>
